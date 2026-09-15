@@ -2,23 +2,29 @@
 //  ContentView.swift
 //  PLog
 //
-//  Created by Manjitha Weerasooriya on 2026-09-16.
+//  Root tab bar: your logged workout days on one tab, the reusable exercise library on the other.
 //
 
 import SwiftUI
+import SwiftData
 
 struct ContentView: View {
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        TabView {
+            HomeView()
+                .tabItem {
+                    Label("Workouts", systemImage: "calendar")
+                }
+
+            ExerciseLibraryView()
+                .tabItem {
+                    Label("Exercises", systemImage: "dumbbell")
+                }
         }
-        .padding()
     }
 }
 
 #Preview {
     ContentView()
+        .modelContainer(SampleData.container)
 }

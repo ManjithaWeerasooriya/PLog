@@ -1,0 +1,54 @@
+# ---------------------------------------------------------------------
+# .gitignore for Xcode / Swift projects
+# ---------------------------------------------------------------------
+
+## macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+## Xcode user-specific & build state
+xcuserdata/
+*.xcuserstate
+*.xcuserdatad
+**/xcshareddata/WorkspaceSettings.xcsettings
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+
+## Build products
+build/
+DerivedData/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+## Swift Package Manager
+.build/
+.swiftpm/
+Packages/
+Package.resolved
+
+## CocoaPods (in case added later)
+Pods/
+
+## Carthage (in case added later)
+Carthage/Build/
+
+## Fastlane (in case added later)
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+## Playground artifacts
+timeline.xctimeline
+playground.xcworkspace
+
+## Injection / misc
+iOSInjectionProject/
+*.log
