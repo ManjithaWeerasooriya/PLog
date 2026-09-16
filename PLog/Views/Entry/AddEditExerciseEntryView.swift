@@ -12,11 +12,16 @@ import SwiftData
 struct AddEditExerciseEntryView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: ExerciseEntryViewModel
+    /// The one set currently expanded (accordion-style — see `SetEditorRow`). Starts on the
+    /// first set so opening the sheet doesn't require an extra tap to adjust it.
+    @State private var expandedSetID: PersistentIdentifier?
 
     /// Context is passed in explicitly because `@Environment` isn't available during `init`,
     /// and the view model needs it to insert/delete sets.
     init(entry: ExerciseEntry, context: ModelContext) {
-        _viewModel = State(initialValue: ExerciseEntryViewModel(entry: entry, context: context))
+        let viewModel = ExerciseEntryViewModel(entry: entry, context: context)
+        _viewModel = State(initialValue: viewModel)
+        _expandedSetID = State(initialValue: viewModel.sets.first?.persistentModelID)
     }
 
     var body: some View {
@@ -32,12 +37,19 @@ struct AddEditExerciseEntryView: View {
 
                 Section("Sets") {
                     ForEach(viewModel.sets) { set in
-                        SetEditorRow(set: set, trend: viewModel.trend(for: set))
+                        SetEditorRow(
+                            set: set,
+                            trend: viewModel.trend(for: set),
+                            isExpanded: isExpanded(set)
+                        )
                     }
                     .onDelete(perform: deleteSets)
 
                     Button {
-                        withAnimation(.snappy) { viewModel.addDuplicateSet() }
+                        withAnimation(.snappy) {
+                            viewModel.addDuplicateSet()
+                            expandedSetID = viewModel.sets.last?.persistentModelID
+                        }
                     } label: {
                         Label("Duplicate Last Set", systemImage: "plus.square.on.square")
                     }
@@ -71,6 +83,13 @@ struct AddEditExerciseEntryView: View {
         for index in offsets {
             viewModel.removeSet(sets[index])
         }
+    }
+
+    private func isExpanded(_ set: SetEntry) -> Binding<Bool> {
+        Binding(
+            get: { expandedSetID == set.persistentModelID },
+            set: { expanded in expandedSetID = expanded ? set.persistentModelID : nil }
+        )
     }
 }
 

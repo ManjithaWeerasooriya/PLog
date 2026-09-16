@@ -2,7 +2,7 @@
 //  AddExerciseView.swift
 //  PLog
 //
-//  A small form for adding a new exercise to the master library.
+//  A form for adding a new exercise to the master library, or editing an existing one.
 //
 
 import SwiftUI
@@ -12,12 +12,18 @@ struct AddExerciseView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
 
+    /// The exercise being edited. `nil` means this is the "New Exercise" flow.
+    var exercise: Exercise? = nil
     var prefilledName: String = ""
-    /// Optional callback fired with the newly created exercise (used by the picker flow).
+    /// Optional callback fired with the newly created (or edited) exercise (used by the
+    /// picker flow to select whatever the user just made).
     var onCreate: ((Exercise) -> Void)? = nil
 
     @State private var name: String = ""
     @State private var category: MuscleGroup = .chest
+    @State private var notes: String = ""
+
+    private var isEditing: Bool { exercise != nil }
 
     var body: some View {
         NavigationStack {
@@ -36,8 +42,13 @@ struct AddExerciseView: View {
                     }
                     .pickerStyle(.navigationLink)
                 }
+
+                Section("Notes") {
+                    TextField("Form cues, machine settings, etc.", text: $notes, axis: .vertical)
+                        .lineLimit(2...5)
+                }
             }
-            .navigationTitle("New Exercise")
+            .navigationTitle(isEditing ? "Edit Exercise" : "New Exercise")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -48,9 +59,7 @@ struct AddExerciseView: View {
                         .disabled(trimmedName.isEmpty)
                 }
             }
-            .onAppear {
-                if name.isEmpty { name = prefilledName }
-            }
+            .onAppear(perform: populateFromExistingExercise)
         }
     }
 
@@ -58,16 +67,39 @@ struct AddExerciseView: View {
         name.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    private func populateFromExistingExercise() {
+        guard let exercise else {
+            if name.isEmpty { name = prefilledName }
+            return
+        }
+        name = exercise.name
+        category = exercise.category
+        notes = exercise.notes
+    }
+
     private func save() {
-        let exercise = Exercise(name: trimmedName, category: category)
-        context.insert(exercise)
-        try? context.save()
-        onCreate?(exercise)
+        if let exercise {
+            exercise.name = trimmedName
+            exercise.category = category
+            exercise.notes = notes
+            try? context.save()
+            onCreate?(exercise)
+        } else {
+            let created = Exercise(name: trimmedName, category: category, notes: notes)
+            context.insert(created)
+            try? context.save()
+            onCreate?(created)
+        }
         dismiss()
     }
 }
 
-#Preview {
+#Preview("New Exercise") {
     AddExerciseView()
+        .modelContainer(SampleData.container)
+}
+
+#Preview("Edit Exercise") {
+    AddExerciseView(exercise: SampleData.benchPress)
         .modelContainer(SampleData.container)
 }

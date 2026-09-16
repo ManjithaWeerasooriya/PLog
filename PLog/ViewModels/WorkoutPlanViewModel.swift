@@ -96,4 +96,54 @@ final class WorkoutPlanViewModel {
     func save() {
         try? context.save()
     }
+
+    // MARK: - Duplication
+
+    /// Copies a plan's full structure (days, exercise slots, targets) into a new, inactive
+    /// plan named "<base> (n)" — the original is untouched and never started/ended.
+    @discardableResult
+    static func duplicate(_ plan: WorkoutPlan, in context: ModelContext) -> WorkoutPlan {
+        let allNames = ((try? context.fetch(FetchDescriptor<WorkoutPlan>())) ?? []).map(\.name)
+        let copy = WorkoutPlan(name: nextCopyName(for: plan.name, existing: allNames), notes: plan.notes)
+        context.insert(copy)
+
+        for day in plan.orderedDays {
+            let dayCopy = PlanDay(name: day.name, order: day.order)
+            context.insert(dayCopy)
+            copy.days.append(dayCopy)
+
+            for slot in day.orderedExercises {
+                let slotCopy = PlanExercise(
+                    exercise: slot.exercise,
+                    order: slot.order,
+                    targetSets: slot.targetSets,
+                    targetReps: slot.targetReps
+                )
+                context.insert(slotCopy)
+                dayCopy.exercises.append(slotCopy)
+            }
+        }
+
+        try? context.save()
+        return copy
+    }
+
+    /// "PPL" -> "PPL (1)"; if "PPL (1)" is taken, "PPL (2)"; duplicating "PPL (1)" itself
+    /// still starts from base name "PPL" rather than compounding to "PPL (1) (1)".
+    private static func nextCopyName(for name: String, existing: [String]) -> String {
+        let base = baseName(from: name)
+        var n = 1
+        while existing.contains("\(base) (\(n))") {
+            n += 1
+        }
+        return "\(base) (\(n))"
+    }
+
+    private static func baseName(from name: String) -> String {
+        guard name.hasSuffix(")"), let openParen = name.lastIndex(of: "(") else { return name }
+        let inner = name[name.index(after: openParen)..<name.index(before: name.endIndex)]
+        guard !inner.isEmpty, inner.allSatisfy(\.isNumber) else { return name }
+        let base = name[..<openParen].trimmingCharacters(in: .whitespaces)
+        return base.isEmpty ? name : base
+    }
 }

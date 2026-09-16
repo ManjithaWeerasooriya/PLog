@@ -12,6 +12,7 @@ import Charts
 
 struct ExerciseHistoryView: View {
     @State private var viewModel: ExerciseHistoryViewModel
+    @State private var showingEdit = false
 
     init(exercise: Exercise) {
         _viewModel = State(initialValue: ExerciseHistoryViewModel(exercise: exercise))
@@ -47,6 +48,18 @@ struct ExerciseHistoryView: View {
         }
         .navigationTitle(viewModel.exercise.name)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showingEdit = true
+                } label: {
+                    Label("Edit", systemImage: "pencil")
+                }
+            }
+        }
+        .sheet(isPresented: $showingEdit) {
+            AddExerciseView(exercise: viewModel.exercise)
+        }
     }
 
     // MARK: - Chart

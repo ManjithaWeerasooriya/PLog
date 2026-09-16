@@ -21,6 +21,7 @@ enum SampleData {
             WorkoutPlan.self,
             PlanDay.self,
             PlanExercise.self,
+            UserProfile.self,
         ])
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         do {
@@ -151,6 +152,7 @@ enum SampleData {
             context.insert(set)
         }
 
+        UserProfile.ensureExists(in: context)
         try? context.save()
     }
 }

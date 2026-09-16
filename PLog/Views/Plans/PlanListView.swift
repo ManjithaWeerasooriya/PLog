@@ -62,10 +62,13 @@ struct PlanListView: View {
                     PlanLogView(plan: plan, context: context, path: $path)
                 }
             }
-            .confirmationDialog(
+            // `.alert` rather than `.confirmationDialog`: the latter renders (at least on
+            // this iOS version) as a small anchored callout that latches onto an arbitrary
+            // ancestor view instead of the swiped row, landing near the top of the list and
+            // pointing at the wrong plan entirely. A centered alert has no anchor to get wrong.
+            .alert(
                 deleteConfirmationTitle,
-                isPresented: $showingDeleteConfirmation,
-                titleVisibility: .visible
+                isPresented: $showingDeleteConfirmation
             ) {
                 Button("Delete", role: .destructive, action: confirmDelete)
                 Button("Cancel", role: .cancel) { pendingDeletePlans = [] }
@@ -90,6 +93,9 @@ struct PlanListView: View {
                         NavigationLink(value: plan) {
                             WorkoutPlanRow(plan: plan)
                         }
+                        .swipeActions(edge: .leading) {
+                            duplicateButton(for: plan)
+                        }
                     }
                     .onDelete { offsets in requestDelete(from: activePlans, at: offsets) }
                 }
@@ -100,11 +106,23 @@ struct PlanListView: View {
                         NavigationLink(value: plan) {
                             WorkoutPlanRow(plan: plan)
                         }
+                        .swipeActions(edge: .leading) {
+                            duplicateButton(for: plan)
+                        }
                     }
                     .onDelete { offsets in requestDelete(from: otherPlans, at: offsets) }
                 }
             }
         }
+    }
+
+    private func duplicateButton(for plan: WorkoutPlan) -> some View {
+        Button {
+            duplicate(plan)
+        } label: {
+            Label("Duplicate", systemImage: "plus.square.on.square")
+        }
+        .tint(.indigo)
     }
 
     private var emptyState: some View {
@@ -130,6 +148,12 @@ struct PlanListView: View {
         context.insert(plan)
         try? context.save()
         path.append(plan)
+    }
+
+    /// Copies the plan's days and exercise slots into a new, inactive plan; stays on the
+    /// list so the user can see it land in "Other Plans" rather than jumping away.
+    private func duplicate(_ plan: WorkoutPlan) {
+        WorkoutPlanViewModel.duplicate(plan, in: context)
     }
 
     /// Stages the swiped plans for deletion, unless one of them is currently active — an

@@ -2,7 +2,7 @@
 //  ExerciseLibraryView.swift
 //  PLog
 //
-//  The master exercise list: searchable, grouped by muscle group, with add/delete.
+//  The master exercise list: searchable, grouped by muscle group, with add/edit/delete.
 //  Tapping an exercise opens its progress history.
 //
 
@@ -16,10 +16,14 @@ struct ExerciseLibraryView: View {
     @State private var searchText = ""
     @State private var categoryFilter: MuscleGroup?
     @State private var showingAddExercise = false
+    @State private var editingExercise: Exercise?
 
-    /// Exercises staged for deletion, pending the confirmation dialog below.
-    @State private var pendingDeleteExercises: [Exercise] = []
-    @State private var showingDeleteConfirmation = false
+    /// The exercise staged for deletion, pending the alert below. `.alert` (not
+    /// `.confirmationDialog`) is deliberate: it's always centered, so there's no anchor to
+    /// mis-place, and it's attached once at the root rather than per-row — attaching a
+    /// presentation to a row that a `.swipeActions` button just collapsed/tore down was
+    /// unreliable (the presentation request could be lost in that transient rebuild).
+    @State private var pendingDeleteExercise: Exercise?
 
     var body: some View {
         NavigationStack {
@@ -47,13 +51,19 @@ struct ExerciseLibraryView: View {
             .sheet(isPresented: $showingAddExercise) {
                 AddExerciseView()
             }
-            .confirmationDialog(
+            .sheet(item: $editingExercise) { exercise in
+                AddExerciseView(exercise: exercise)
+            }
+            .alert(
                 deleteConfirmationTitle,
-                isPresented: $showingDeleteConfirmation,
-                titleVisibility: .visible
+                isPresented: isShowingDeleteConfirmation
             ) {
-                Button("Delete", role: .destructive, action: confirmDelete)
-                Button("Cancel", role: .cancel) { pendingDeleteExercises = [] }
+                Button("Delete", role: .destructive) {
+                    if let pendingDeleteExercise {
+                        confirmDelete(pendingDeleteExercise)
+                    }
+                }
+                Button("Cancel", role: .cancel) { pendingDeleteExercise = nil }
             } message: {
                 Text("Logged sets that used it are kept, just no longer linked to an exercise.")
             }
@@ -72,9 +82,21 @@ struct ExerciseLibraryView: View {
                         } label: {
                             row(for: exercise)
                         }
-                    }
-                    .onDelete { offsets in
-                        requestDelete(from: section.items, at: offsets)
+                        .swipeActions(edge: .leading) {
+                            Button {
+                                editingExercise = exercise
+                            } label: {
+                                Label("Edit", systemImage: "pencil")
+                            }
+                            .tint(.blue)
+                        }
+                        .swipeActions(edge: .trailing) {
+                            Button(role: .destructive) {
+                                pendingDeleteExercise = exercise
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
                     }
                 } header: {
                     Label(section.group.displayName, systemImage: section.group.systemImage)
@@ -141,25 +163,26 @@ struct ExerciseLibraryView: View {
         }
     }
 
-    private func requestDelete(from items: [Exercise], at offsets: IndexSet) {
-        pendingDeleteExercises = offsets.map { items[$0] }
-        showingDeleteConfirmation = true
+    // MARK: - Deletion
+
+    private var isShowingDeleteConfirmation: Binding<Bool> {
+        Binding(
+            get: { pendingDeleteExercise != nil },
+            set: { isPresented in
+                if !isPresented { pendingDeleteExercise = nil }
+            }
+        )
     }
 
-    private func confirmDelete() {
-        for exercise in pendingDeleteExercises {
-            context.delete(exercise)
-        }
-        pendingDeleteExercises = []
+    private func confirmDelete(_ exercise: Exercise) {
+        context.delete(exercise)
+        pendingDeleteExercise = nil
         try? context.save()
     }
 
     private var deleteConfirmationTitle: String {
-        if pendingDeleteExercises.count == 1 {
-            let name = pendingDeleteExercises[0].name
-            return "Delete “\(name.isEmpty ? "Exercise" : name)”?"
-        }
-        return "Delete \(pendingDeleteExercises.count) Exercises?"
+        let name = pendingDeleteExercise?.name ?? ""
+        return "Delete “\(name.isEmpty ? "Exercise" : name)”?"
     }
 }
 

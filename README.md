@@ -6,9 +6,11 @@ An iOS workout tracker built for progressive overload. Log your sets per exercis
 
 - **Log workouts** — pick a day from your active plan and the session is created with every exercise and set pre-filled; you only update the weights. Or start from a blank workout
 - **Progressive overload at a glance** — every set is compared against your last session using estimated one-rep max (Epley formula), so trading weight for reps (or vice versa) is still recognized as progress
-- **Exercise library** — a reusable master list of exercises, organized by muscle group, with per-exercise history charts
-- **Workout plans** — build a rotation of day templates (Push, Pull, Legs, …), each pre-filled with target sets × reps per exercise; start a plan to begin logging against it and end it when the program is over
+- **Exercise library** — a reusable master list of exercises, organized by muscle group, editable in place, with per-exercise history charts
+- **Workout plans** — build a rotation of day templates (Push, Pull, Legs, …), each pre-filled with target sets × reps per exercise; start a plan to begin logging against it and end it when the program is over. Duplicate a plan to tweak a copy without touching the original; only one plan is ever active at a time
 - **Workout log** — a day-by-day timeline for an active plan, with gaps between sessions labeled as rest days
+- **Settings** — your name, gender, age, height and weight; light/dark/system appearance
+- **Scrollable wheel pickers** for every number you enter (weight, reps, sets, age, height, weight) instead of tapping +/- repeatedly
 - **Starter content** — first launch seeds an exercise library and two sample plans (Push / Pull / Legs, Upper / Lower) so you can try it immediately
 
 ## Requirements

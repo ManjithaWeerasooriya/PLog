@@ -10,6 +10,11 @@ import SwiftData
 
 @main
 struct PLogApp: App {
+    /// The user's light/dark mode preference, set in Settings. Shared with `SettingsView`
+    /// via the same `UserDefaults` key rather than a binding — `@AppStorage` keeps both in
+    /// sync automatically.
+    @AppStorage("appTheme") private var appTheme = AppTheme.system
+
     /// The app-wide SwiftData container. Listing every model is explicit and future-proof;
     /// SwiftData wires up the relationships from here.
     let container: ModelContainer = {
@@ -21,11 +26,14 @@ struct PLogApp: App {
             WorkoutPlan.self,
             PlanDay.self,
             PlanExercise.self,
+            UserProfile.self,
         ])
         do {
             let container = try ModelContainer(for: schema)
             // First launch only: a starter exercise library and sample plans to log against.
             StarterData.seedIfNeeded(in: container.mainContext)
+            // Always: guarantees exactly one UserProfile row exists for Settings to edit.
+            UserProfile.ensureExists(in: container.mainContext)
             return container
         } catch {
             fatalError("Failed to create ModelContainer: \(error)")
@@ -35,6 +43,7 @@ struct PLogApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .preferredColorScheme(appTheme.colorScheme)
         }
         .modelContainer(container)
     }

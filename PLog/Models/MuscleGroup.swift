@@ -17,6 +17,9 @@ enum MuscleGroup: String, Codable, CaseIterable, Identifiable {
     case legs
     case shoulders
     case arms
+    case traps
+    case triceps
+    case forearms
     case core
     case cardio
     case fullBody
@@ -32,6 +35,9 @@ enum MuscleGroup: String, Codable, CaseIterable, Identifiable {
         case .legs: return "Legs"
         case .shoulders: return "Shoulders"
         case .arms: return "Arms"
+        case .traps: return "Traps"
+        case .triceps: return "Triceps"
+        case .forearms: return "Forearms"
         case .core: return "Core"
         case .cardio: return "Cardio"
         case .fullBody: return "Full Body"
@@ -47,6 +53,9 @@ enum MuscleGroup: String, Codable, CaseIterable, Identifiable {
         case .legs: return "figure.strengthtraining.functional"
         case .shoulders: return "figure.arms.open"
         case .arms: return "dumbbell"
+        case .traps: return "figure.boxing"
+        case .triceps: return "dumbbell.fill"
+        case .forearms: return "hand.raised.fill"
         case .core: return "figure.core.training"
         case .cardio: return "figure.run"
         case .fullBody: return "figure.mixed.cardio"
@@ -62,6 +71,9 @@ enum MuscleGroup: String, Codable, CaseIterable, Identifiable {
         case .legs: return .green
         case .shoulders: return .orange
         case .arms: return .purple
+        case .traps: return .indigo
+        case .triceps: return .mint
+        case .forearms: return .cyan
         case .core: return .yellow
         case .cardio: return .pink
         case .fullBody: return .teal

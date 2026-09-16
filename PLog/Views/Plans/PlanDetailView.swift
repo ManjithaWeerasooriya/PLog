@@ -63,10 +63,13 @@ struct PlanDetailView: View {
         } message: {
             Text("Name the training day, then add its exercises.")
         }
-        .confirmationDialog(
+        // `.alert` rather than `.confirmationDialog`: the latter renders (at least on this
+        // iOS version) as a small anchored callout that latches onto an arbitrary ancestor
+        // view instead of appearing near the button that triggered it. A centered alert has
+        // no anchor to get wrong.
+        .alert(
             "End this plan?",
-            isPresented: $confirmingEnd,
-            titleVisibility: .visible
+            isPresented: $confirmingEnd
         ) {
             Button("End Plan", role: .destructive) { viewModel.end() }
         } message: {
