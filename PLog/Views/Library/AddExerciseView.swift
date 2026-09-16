@@ -21,8 +21,19 @@ struct AddExerciseView: View {
     @State private var name: String
     @State private var category: MuscleGroup
     @State private var notes: String
+    @State private var confirmingDiscard = false
 
     private var isEditing: Bool { exercise != nil }
+
+    /// Compares the draft fields against the exercise as it stood when this sheet opened
+    /// (or, for a new exercise, against a blank draft) to decide whether Cancel needs to
+    /// confirm before discarding.
+    private var hasChanges: Bool {
+        guard let exercise else {
+            return !trimmedName.isEmpty || category != .chest || !notes.isEmpty
+        }
+        return name != exercise.name || category != exercise.category || notes != exercise.notes
+    }
 
     /// Seeds the `@State` once, here, rather than in `.onAppear` — `.onAppear` re-fires when
     /// the "Muscle Group" navigation-link picker is popped back to this screen (the view
@@ -59,18 +70,41 @@ struct AddExerciseView: View {
                         .lineLimit(2...5)
                 }
             }
-            .navigationTitle(isEditing ? "Edit Exercise" : "New Exercise")
+            .navigationTitle(baseTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") {
+                        if hasChanges {
+                            confirmingDiscard = true
+                        } else {
+                            dismiss()
+                        }
+                    }
+                }
+                ToolbarItem(placement: .principal) {
+                    HStack(spacing: 6) {
+                        Text(baseTitle).font(.headline)
+                        if hasChanges { UnsavedTag() }
+                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save", action: save)
                         .disabled(trimmedName.isEmpty)
                 }
             }
+            .interactiveDismissDisabled(hasChanges)
+            .alert("Discard Changes?", isPresented: $confirmingDiscard) {
+                Button("Discard", role: .destructive) { dismiss() }
+                Button("Keep Editing", role: .cancel) {}
+            } message: {
+                Text(isEditing ? "Your edits to this exercise will be lost." : "This exercise won't be created.")
+            }
         }
+    }
+
+    private var baseTitle: String {
+        isEditing ? "Edit Exercise" : "New Exercise"
     }
 
     private var trimmedName: String {

@@ -48,7 +48,9 @@ PLog/                        ← repo root
     │   └── WorkoutPlanViewModel.swift     ← start/end, day CRUD, logWorkout(for:) stamping
     ├── Views/
     │   ├── Components/
-    │   │   ├── NumberPickerWheel.swift ← scrollable wheel picker for weight/reps/sets/age/etc.
+    │   │   ├── NumberPickerWheel.swift    ← scrollable wheel picker for weight/reps/sets/age/etc.
+    │   │   ├── UnsavedChangesGuard.swift  ← .confirmBeforeLeaving(...) — see Architecture
+    │   │   ├── UnsavedTag.swift     ← "Unsaved" capsule pill — same style as PlanStatusPill
     │   │   └── TrendBadge.swift     ← green/red/gray capsule pill; CategoryChip
     │   ├── Home/
     │   │   ├── HomeView.swift       ← Logs tab: sessions by month; "+" picks a plan day
@@ -130,7 +132,9 @@ Setting only the to-one side (`slot.planDay = day`, or passing it to the `init`)
 
 ### MuscleGroup categories
 
-`traps` / `triceps` / `forearms` exist alongside the coarser `arms` (which still covers biceps — there's no dedicated biceps category). `StarterData`'s "Tricep Pushdown" is tagged `.triceps`, not `.arms`, since it has a direct match; new seed/preset exercises should prefer the most specific matching category over `arms` the same way. Every new `MuscleGroup` case needs a `displayName`, `systemImage`, and `color` — the three `switch` statements are exhaustive, so the compiler catches a missing case, but picking a `systemImage` that doesn't actually exist as an SF Symbol will still compile and just render blank at runtime; verify a new icon on-device/in a preview, don't just trust the compiler.
+`biceps` / `traps` / `triceps` / `forearms` are all specific arm/shoulder-girdle categories — there's no generic "arms" catch-all anymore. `StarterData`'s "Tricep Pushdown" is tagged `.triceps`, "Bicep Curl"/"Hammer Curl" are `.biceps`; new seed/preset exercises should always prefer the most specific matching category. Every new `MuscleGroup` case needs a `displayName`, `systemImage`, and `color` — the three `switch` statements are exhaustive, so the compiler catches a missing case, but picking a `systemImage` that doesn't actually exist as an SF Symbol will still compile and just render blank at runtime; verify a new icon on-device/in a preview, don't just trust the compiler.
+
+**Renaming a case**: `biceps` was originally `arms`, renamed for clarity once `triceps`/`forearms` existed and made the old generic name confusing. The case declaration explicitly pins the raw value to the old name (`case biceps = "arms"`) so any `Exercise` already persisted with that category — including on a device/simulator that had the app installed before the rename — still decodes correctly; only the displayed label changed. **Follow this pattern for any future enum-case rename on a `@Model` property** (`Gender`, `MuscleGroup`, `PlanStatus`, `AppTheme`): `case newName = "oldRawValue"`, never a bare rename — a bare rename changes the persisted raw string too, and existing rows with the old string silently fail to decode.
 
 ### UserProfile is a guaranteed singleton
 
@@ -196,6 +200,18 @@ Do not deviate from this pattern. Do not try to capture `@Environment` in an `in
 ### First-launch starter data
 
 `PLogApp` calls `StarterData.seedIfNeeded(in:)` right after building the container. It seeds only when there are **zero** `Exercise` rows: a 20-exercise library across all muscle groups, an active "Push / Pull / Legs" plan (3 days, 5 slots each) and a not-started "Upper / Lower" plan. It never touches a store that already has data. This is distinct from `SampleData`, which is the in-memory preview fixture and also seeds workout history.
+
+### Unsaved-changes confirmation on every live-editing screen
+
+Every screen that live-binds `@Model` properties (so edits apply the instant the user types/scrolls, with no separate "save" step) confirms before letting the user navigate away with unsaved edits, and shows an `UnsavedTag` (`Views/Components/UnsavedTag.swift` — a capsule pill, same visual language as `PlanStatusPill`/`CategoryChip`/`TrendBadge`) next to the title while dirty. It sits in a custom `.principal` toolbar item beside the title text, not appended into the title string itself — `.navigationTitle` only takes a plain `String`, so it can't carry a colored/shaped tag. This covers `PlanDayDetailView` (day name + each slot's target sets/reps), `DayDetailView` (session name/date/notes), `PlanDetailView` (plan name/notes), `AddEditExerciseEntryView` (set weights/reps, plus adding/removing sets), and `AddExerciseView` (name/category/notes). **Do not add a new live-binding editor without this** — it's the whole point of the fix described below.
+
+**Pushed screens** (`PlanDayDetailView`, `DayDetailView`, `PlanDetailView`) use the shared `.confirmBeforeLeaving(title:hasChanges:onSave:onDiscard:)` modifier (`Views/Components/UnsavedChangesGuard.swift`). It hides the system back button and replaces it with one that pops immediately when `hasChanges` is false, or shows an alert (Save / Discard Changes / Cancel) when true; it also renders the `.principal` title + `UnsavedTag` itself, so callers just pass `title:` as a plain string. Each screen supplies its own `hasChanges` (compare current model values to a baseline captured in `init`, **not** `.onAppear` — see the `AddExerciseView` note above for why that specifically breaks) and `onDiscard` (reassign the tracked scalar properties back to the baseline). **Trade-off**: hiding the back button also disables the edge-swipe-back gesture on these screens — an accepted cost of forcing the confirmation path; don't try to "fix" this by un-hiding the button, that defeats the guard.
+
+**The Sets editor sheet** (`AddEditExerciseEntryView`) can't use the scalar-revert approach because sets can be *added and removed*, not just edited — reverting means restoring the whole list. `ExerciseEntryViewModel.currentSnapshot`/`revert(to:)` capture/restore the full set list by **deleting everything and recreating fresh `SetEntry` objects from the snapshot**, rather than diffing/matching old vs. new — this is what makes it correct regardless of which combination of edit/add/remove/reorder happened. The sheet adds an explicit "Cancel" (previously it only had "Done") that confirms via the same Save/Discard Changes/Cancel alert when dirty, plus `.interactiveDismissDisabled(hasChanges)` so swiping the sheet away can't bypass the prompt.
+
+**`AddExerciseView`** already used a local-draft pattern (see the `.onAppear`-vs-`init` note above) where Cancel silently discarded correctly — it just didn't *ask* first. Added the same confirm-before-discard alert for consistency; no revert logic needed there since the model was never touched until Save.
+
+**Deliberately excluded**: `SettingsView` (a root tab, not a pushed/sheeted editor — there's no "back" gesture to guard, and live-applying preferences instantly matches how Settings apps conventionally behave) and the explicit destructive buttons ("Remove Exercise from Day", swipe-to-delete elsewhere) — those are already unambiguous, already-confirmed (or single-purpose) actions, not the "silently saved by navigating away" failure mode this fix targets.
 
 ### Destructive actions confirm first — use `.alert`, not `.confirmationDialog`
 
@@ -276,9 +292,9 @@ For an `Int?`/`Double?` model field (`UserProfile.age`/`heightCm`/`weightKg`), b
 
 Two wheels side by side in one row (`SetEditorRow`, `PlanExerciseRow`) fit comfortably at their default sizing; this replaced the old `ValueStepper` (+/- buttons), which needed hand-tuned compact sizing to avoid clipping at this width and has been deleted.
 
-### Sets and exercise cards are collapsible, accordion-style — same pattern, same look
+### Sets, logged exercises, and plan-day slots are all collapsible, accordion-style — same pattern, same look
 
-Both `SetEditorRow` (inside `AddEditExerciseEntryView`) and `ExerciseEntryCard` (inside `DayDetailView`) take `isExpanded: Binding<Bool>` rather than owning their own `@State`. The parent holds a single `expanded…ID: PersistentIdentifier?` and hands each row a computed `Binding` that compares against it, so **only one row is ever expanded at a time** in either list. Both start with everything collapsed (`AddEditExerciseEntryView` is the one exception — it seeds `expandedSetID` to the first set's ID in `init` so opening the sheet needs no extra tap to adjust the set you almost certainly care about, and re-points it whenever "Duplicate Last Set" runs; `DayDetailView`'s `expandedEntryID` starts `nil` unconditionally, including for plan-logged sessions that used to auto-expand every card — don't reintroduce that).
+`SetEditorRow` (inside `AddEditExerciseEntryView`), `ExerciseEntryCard` (inside `DayDetailView`), and `PlanExerciseRow` (inside `PlanDayDetailView`) all take `isExpanded: Binding<Bool>` rather than owning their own `@State`. Each parent holds a single `expanded…ID: PersistentIdentifier?` and hands every row a computed `Binding` that compares against it, so **only one row is ever expanded at a time** in any of the three lists — these are three independent instances of the same pattern (one per list, not a single shared ID), so expanding a set doesn't affect which exercise or slot is expanded elsewhere. Both start with everything collapsed (`AddEditExerciseEntryView` is the one exception — it seeds `expandedSetID` to the first set's ID in `init` so opening the sheet needs no extra tap to adjust the set you almost certainly care about, and re-points it whenever "Duplicate Last Set" runs; `DayDetailView`'s `expandedEntryID` starts `nil` unconditionally, including for plan-logged sessions that used to auto-expand every card — don't reintroduce that).
 
 Visually, both lists are **plain rows inside one shared `Section`** — a header (name/summary + trailing chevron that rotates on expand) that reveals more content below when tapped, no per-row card background or hidden separators. `ExerciseEntryCard` used to render each exercise as its own floating rounded-rect card (`.background(...,  in: RoundedRectangle(...))`, `.listRowSeparator(.hidden)`); that's gone specifically so the exercises list in `DayDetailView` matches the sets list's look. Keep any new expandable list in this style — a shared `Section`, `Binding`-driven per-row expansion, no individual card chrome — rather than reinventing a bespoke card look.
 

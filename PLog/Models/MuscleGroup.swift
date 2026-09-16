@@ -16,7 +16,9 @@ enum MuscleGroup: String, Codable, CaseIterable, Identifiable {
     case back
     case legs
     case shoulders
-    case arms
+    /// Raw value kept as "arms" (the case's old name) so any exercise already persisted
+    /// with that category still decodes correctly — only the label changed.
+    case biceps = "arms"
     case traps
     case triceps
     case forearms
@@ -34,7 +36,7 @@ enum MuscleGroup: String, Codable, CaseIterable, Identifiable {
         case .back: return "Back"
         case .legs: return "Legs"
         case .shoulders: return "Shoulders"
-        case .arms: return "Arms"
+        case .biceps: return "Biceps"
         case .traps: return "Traps"
         case .triceps: return "Triceps"
         case .forearms: return "Forearms"
@@ -52,7 +54,7 @@ enum MuscleGroup: String, Codable, CaseIterable, Identifiable {
         case .back: return "figure.rower"
         case .legs: return "figure.strengthtraining.functional"
         case .shoulders: return "figure.arms.open"
-        case .arms: return "dumbbell"
+        case .biceps: return "dumbbell"
         case .traps: return "figure.boxing"
         case .triceps: return "dumbbell.fill"
         case .forearms: return "hand.raised.fill"
@@ -70,7 +72,7 @@ enum MuscleGroup: String, Codable, CaseIterable, Identifiable {
         case .back: return .blue
         case .legs: return .green
         case .shoulders: return .orange
-        case .arms: return .purple
+        case .biceps: return .purple
         case .traps: return .indigo
         case .triceps: return .mint
         case .forearms: return .cyan

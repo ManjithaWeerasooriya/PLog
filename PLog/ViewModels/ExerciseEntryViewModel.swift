@@ -9,6 +9,16 @@
 import Foundation
 import SwiftData
 
+/// A full-fidelity copy of one set's fields, used only to snapshot/restore a set list —
+/// distinct from `SetSnapshot` (weight+reps only, used for progressive-overload math).
+struct SetFieldSnapshot: Equatable {
+    let setNumber: Int
+    let weight: Double
+    let reps: Int
+    let rpe: Double?
+    let notes: String?
+}
+
 @MainActor
 @Observable
 final class ExerciseEntryViewModel {
@@ -87,5 +97,38 @@ final class ExerciseEntryViewModel {
     func discard() {
         context.delete(entry)
         try? context.save()
+    }
+
+    // MARK: - Unsaved-changes snapshot
+
+    /// The set list's current fields, for comparing against a baseline captured when the
+    /// editor opened (see `AddEditExerciseEntryView`).
+    var currentSnapshot: [SetFieldSnapshot] {
+        sets.map {
+            SetFieldSnapshot(setNumber: $0.setNumber, weight: $0.weight, reps: $0.reps, rpe: $0.rpe, notes: $0.notes)
+        }
+    }
+
+    /// Restores the set list to exactly the given snapshot by deleting every current set and
+    /// recreating fresh `SetEntry` objects from it. A full delete-and-recreate (rather than
+    /// diffing/matching) is what makes this correct regardless of which combination of
+    /// edit/add/remove/reorder happened since the snapshot was taken.
+    func revert(to snapshot: [SetFieldSnapshot]) {
+        for set in entry.sets {
+            context.delete(set)
+        }
+        entry.sets.removeAll()
+        for saved in snapshot {
+            let restored = SetEntry(
+                setNumber: saved.setNumber,
+                weight: saved.weight,
+                reps: saved.reps,
+                rpe: saved.rpe,
+                notes: saved.notes,
+                entry: entry
+            )
+            context.insert(restored)
+            entry.sets.append(restored)
+        }
     }
 }

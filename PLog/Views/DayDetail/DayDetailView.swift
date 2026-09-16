@@ -23,12 +23,24 @@ struct DayDetailView: View {
     /// Starts `nil` so every exercise opens collapsed, matching the set list's behavior.
     @State private var expandedEntryID: PersistentIdentifier?
 
+    /// Baseline the session's name/date/notes are compared against to decide whether the
+    /// back button should confirm before leaving.
+    @State private var originalName: String
+    @State private var originalDate: Date
+    @State private var originalNotes: String
+
+    init(day: WorkoutDay) {
+        _day = Bindable(wrappedValue: day)
+        _originalName = State(initialValue: day.name)
+        _originalDate = State(initialValue: day.date)
+        _originalNotes = State(initialValue: day.notes)
+    }
+
     var body: some View {
         List {
             detailsSection
             exercisesSection
         }
-        .navigationTitle(day.date.mediumDayLabel)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -45,6 +57,28 @@ struct DayDetailView: View {
         .sheet(item: $editingEntry) { entry in
             AddEditExerciseEntryView(entry: entry, context: context)
         }
+        .confirmBeforeLeaving(
+            title: day.date.mediumDayLabel,
+            hasChanges: hasChanges,
+            onSave: saveChanges,
+            onDiscard: discardChanges
+        )
+    }
+
+    // MARK: - Unsaved changes
+
+    private var hasChanges: Bool {
+        day.name != originalName || day.date != originalDate || day.notes != originalNotes
+    }
+
+    private func saveChanges() {
+        try? context.save()
+    }
+
+    private func discardChanges() {
+        day.name = originalName
+        day.date = originalDate
+        day.notes = originalNotes
     }
 
     // MARK: - Sections

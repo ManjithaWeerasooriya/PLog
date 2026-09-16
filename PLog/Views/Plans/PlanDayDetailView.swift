@@ -15,6 +15,25 @@ struct PlanDayDetailView: View {
     @Bindable var day: PlanDay
 
     @State private var showingExercisePicker = false
+    /// The one exercise slot currently expanded (accordion-style — see `PlanExerciseRow`).
+    @State private var expandedSlotID: PersistentIdentifier?
+
+    /// Baseline the day's name and each slot's target sets/reps are compared against to
+    /// decide whether the back button should confirm before leaving. Structural changes
+    /// (adding/removing/reordering exercises) are excluded — those already save immediately,
+    /// same as before this screen had a "Save"/"Discard" concept at all.
+    @State private var originalName: String
+    @State private var originalTargets: [PersistentIdentifier: (sets: Int, reps: Int)]
+
+    init(day: PlanDay) {
+        _day = Bindable(wrappedValue: day)
+        _originalName = State(initialValue: day.name)
+        _originalTargets = State(
+            initialValue: Dictionary(uniqueKeysWithValues: day.exercises.map {
+                ($0.persistentModelID, ($0.targetSets, $0.targetReps))
+            })
+        )
+    }
 
     var body: some View {
         List {
@@ -25,7 +44,6 @@ struct PlanDayDetailView: View {
 
             exercisesSection
         }
-        .navigationTitle(day.name.isEmpty ? "Day" : day.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -41,6 +59,36 @@ struct PlanDayDetailView: View {
         }
         .sheet(isPresented: $showingExercisePicker) {
             ExercisePickerView(onSelect: addExercise)
+        }
+        .confirmBeforeLeaving(
+            title: day.name.isEmpty ? "Day" : day.name,
+            hasChanges: hasChanges,
+            onSave: saveChanges,
+            onDiscard: discardChanges
+        )
+    }
+
+    // MARK: - Unsaved changes
+
+    private var hasChanges: Bool {
+        if day.name != originalName { return true }
+        for slot in day.exercises {
+            guard let original = originalTargets[slot.persistentModelID] else { continue }
+            if slot.targetSets != original.sets || slot.targetReps != original.reps { return true }
+        }
+        return false
+    }
+
+    private func saveChanges() {
+        try? context.save()
+    }
+
+    private func discardChanges() {
+        day.name = originalName
+        for slot in day.exercises {
+            guard let original = originalTargets[slot.persistentModelID] else { continue }
+            slot.targetSets = original.sets
+            slot.targetReps = original.reps
         }
     }
 
@@ -59,12 +107,19 @@ struct PlanDayDetailView: View {
         } else {
             Section("Exercises") {
                 ForEach(day.orderedExercises) { slot in
-                    PlanExerciseRow(planExercise: slot)
+                    PlanExerciseRow(planExercise: slot, isExpanded: isExpanded(slot))
                 }
                 .onDelete(perform: deleteExercises)
                 .onMove(perform: moveExercises)
             }
         }
+    }
+
+    private func isExpanded(_ slot: PlanExercise) -> Binding<Bool> {
+        Binding(
+            get: { expandedSlotID == slot.persistentModelID },
+            set: { expanded in expandedSlotID = expanded ? slot.persistentModelID : nil }
+        )
     }
 
     // MARK: - Actions

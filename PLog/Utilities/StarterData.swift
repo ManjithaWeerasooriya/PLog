@@ -27,7 +27,7 @@ enum StarterData {
             ("Back Squat", .legs), ("Romanian Deadlift", .legs), ("Leg Press", .legs),
             ("Leg Curl", .legs), ("Calf Raise", .legs),
             ("Overhead Press", .shoulders), ("Lateral Raise", .shoulders), ("Face Pull", .shoulders),
-            ("Bicep Curl", .arms), ("Hammer Curl", .arms), ("Tricep Pushdown", .triceps),
+            ("Bicep Curl", .biceps), ("Hammer Curl", .biceps), ("Tricep Pushdown", .triceps),
             ("Plank", .core), ("Hanging Leg Raise", .core),
         ]
         var exercises: [String: Exercise] = [:]

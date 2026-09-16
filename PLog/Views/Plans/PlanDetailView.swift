@@ -16,9 +16,16 @@ struct PlanDetailView: View {
     @State private var newDayName = ""
     @State private var confirmingEnd = false
 
+    /// Baseline the plan's name/notes are compared against to decide whether the back
+    /// button should confirm before leaving.
+    @State private var originalName: String
+    @State private var originalNotes: String
+
     /// Context is passed in explicitly because `@Environment` isn't available during `init`.
     init(plan: WorkoutPlan, context: ModelContext) {
         _viewModel = State(initialValue: WorkoutPlanViewModel(plan: plan, context: context))
+        _originalName = State(initialValue: plan.name)
+        _originalNotes = State(initialValue: plan.notes)
     }
 
     var body: some View {
@@ -45,7 +52,6 @@ struct PlanDetailView: View {
 
             daysSection
         }
-        .navigationTitle(plan.name.isEmpty ? "Plan" : plan.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -75,6 +81,27 @@ struct PlanDetailView: View {
         } message: {
             Text("Your logged workouts are kept. You can restart the plan later.")
         }
+        .confirmBeforeLeaving(
+            title: plan.name.isEmpty ? "Plan" : plan.name,
+            hasChanges: hasChanges,
+            onSave: saveChanges,
+            onDiscard: discardChanges
+        )
+    }
+
+    // MARK: - Unsaved changes
+
+    private var hasChanges: Bool {
+        viewModel.plan.name != originalName || viewModel.plan.notes != originalNotes
+    }
+
+    private func saveChanges() {
+        viewModel.save()
+    }
+
+    private func discardChanges() {
+        viewModel.plan.name = originalName
+        viewModel.plan.notes = originalNotes
     }
 
     // MARK: - Sections

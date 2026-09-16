@@ -16,12 +16,18 @@ struct AddEditExerciseEntryView: View {
     /// first set so opening the sheet doesn't require an extra tap to adjust it.
     @State private var expandedSetID: PersistentIdentifier?
 
+    /// The set list as it stood when the sheet opened (including the auto-prefilled first
+    /// set), for the "unsaved changes" confirmation on Cancel/swipe-dismiss.
+    @State private var originalSets: [SetFieldSnapshot]
+    @State private var confirmingDiscard = false
+
     /// Context is passed in explicitly because `@Environment` isn't available during `init`,
     /// and the view model needs it to insert/delete sets.
     init(entry: ExerciseEntry, context: ModelContext) {
         let viewModel = ExerciseEntryViewModel(entry: entry, context: context)
         _viewModel = State(initialValue: viewModel)
         _expandedSetID = State(initialValue: viewModel.sets.first?.persistentModelID)
+        _originalSets = State(initialValue: viewModel.currentSnapshot)
     }
 
     var body: some View {
@@ -67,6 +73,21 @@ struct AddEditExerciseEntryView: View {
             .navigationTitle(viewModel.exerciseName)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        if hasChanges {
+                            confirmingDiscard = true
+                        } else {
+                            dismiss()
+                        }
+                    }
+                }
+                ToolbarItem(placement: .principal) {
+                    HStack(spacing: 6) {
+                        Text(viewModel.exerciseName).font(.headline)
+                        if hasChanges { UnsavedTag() }
+                    }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
                         viewModel.save()
@@ -75,7 +96,29 @@ struct AddEditExerciseEntryView: View {
                     .fontWeight(.semibold)
                 }
             }
+            // Forces the user through Cancel/Done instead of silently keeping whatever's on
+            // screen — swiping away used to apply live-bound edits with no way to back out.
+            .interactiveDismissDisabled(hasChanges)
+            .alert("Save Changes?", isPresented: $confirmingDiscard) {
+                Button("Save") {
+                    viewModel.save()
+                    dismiss()
+                }
+                Button("Discard Changes", role: .destructive) {
+                    viewModel.revert(to: originalSets)
+                    dismiss()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("You have unsaved changes to \(viewModel.exerciseName).")
+            }
         }
+    }
+
+    // MARK: - Unsaved changes
+
+    private var hasChanges: Bool {
+        viewModel.currentSnapshot != originalSets
     }
 
     private func deleteSets(at offsets: IndexSet) {
