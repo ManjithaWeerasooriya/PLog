@@ -23,7 +23,13 @@ struct ExerciseEntryCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            // Only the header toggles expansion; a card-wide tap gesture would swallow the
+            // Edit/History buttons below.
             header
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    withAnimation(.snappy) { isExpanded.toggle() }
+                }
 
             if isExpanded {
                 Divider()
@@ -33,10 +39,6 @@ struct ExerciseEntryCard: View {
         }
         .padding()
         .background(.background.secondary, in: RoundedRectangle(cornerRadius: 14))
-        .contentShape(Rectangle())
-        .onTapGesture {
-            withAnimation(.snappy) { isExpanded.toggle() }
-        }
     }
 
     // MARK: - Header
@@ -95,11 +97,6 @@ struct ExerciseEntryCard: View {
                             previous: previousTopSet
                         )
                     )
-
-                    if set.completed {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                    }
                 }
             }
         }
@@ -110,6 +107,7 @@ struct ExerciseEntryCard: View {
             Button(action: onEdit) {
                 Label("Edit", systemImage: "square.and.pencil")
             }
+            .buttonStyle(.borderless)
             Spacer()
             if let exercise = entry.exercise {
                 NavigationLink {

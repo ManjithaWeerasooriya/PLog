@@ -14,6 +14,10 @@ struct ValueStepper: View {
     var step: Double = 2.5
     var range: ClosedRange<Double> = 0...10_000
     var unit: String? = nil
+    /// Diameter of the +/- buttons. Shrink for rows that must fit two steppers side by side.
+    var buttonSize: CGFloat = 40
+    /// Minimum width reserved for the value label.
+    var valueMinWidth: CGFloat = 70
     /// How to render the current value (e.g. drop trailing ".0").
     var format: (Double) -> String = { WeightFormatter.string($0) }
 
@@ -38,7 +42,7 @@ struct ValueStepper: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                .frame(minWidth: 70)
+                .frame(minWidth: valueMinWidth)
 
                 stepButton(systemName: "plus", disabled: value + step > range.upperBound) {
                     value = min(range.upperBound, value + step)
@@ -53,7 +57,7 @@ struct ValueStepper: View {
         } label: {
             Image(systemName: systemName)
                 .font(.headline)
-                .frame(width: 40, height: 40)
+                .frame(width: buttonSize, height: buttonSize)
                 .background(.tint.opacity(0.15), in: Circle())
         }
         .buttonStyle(.plain)
@@ -69,7 +73,9 @@ extension ValueStepper {
         intValue: Binding<Int>,
         step: Int = 1,
         range: ClosedRange<Int> = 0...999,
-        unit: String? = nil
+        unit: String? = nil,
+        buttonSize: CGFloat = 40,
+        valueMinWidth: CGFloat = 70
     ) {
         self.title = title
         self._value = Binding(
@@ -79,6 +85,8 @@ extension ValueStepper {
         self.step = Double(step)
         self.range = Double(range.lowerBound)...Double(range.upperBound)
         self.unit = unit
+        self.buttonSize = buttonSize
+        self.valueMinWidth = valueMinWidth
         self.format = { String(Int($0)) }
     }
 }

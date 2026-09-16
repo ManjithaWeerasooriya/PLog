@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import SwiftData
 
 /// A single point on an exercise's progress timeline (one logged session).
 struct ExerciseHistoryPoint: Identifiable {

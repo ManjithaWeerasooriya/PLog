@@ -2,8 +2,9 @@
 //  SetEditorRow.swift
 //  PLog
 //
-//  One editable set in the quick-entry screen: weight & reps steppers, completion toggle,
-//  and a live progressive-overload badge versus the previous session.
+//  One editable set in the quick-entry screen: weight & reps steppers and a live
+//  progressive-overload badge versus the previous session. A set counts as "added" simply
+//  by existing in the list — there's no separate completion toggle.
 //
 
 import SwiftUI
@@ -19,20 +20,28 @@ struct SetEditorRow: View {
                 Text("Set \(set.setNumber)")
                     .font(.subheadline.weight(.semibold))
                 TrendBadge(trend: trend)
-                Spacer()
-                Button {
-                    withAnimation(.snappy) { set.completed.toggle() }
-                } label: {
-                    Image(systemName: set.completed ? "checkmark.circle.fill" : "circle")
-                        .font(.title3)
-                        .foregroundStyle(set.completed ? .green : .secondary)
-                }
-                .buttonStyle(.plain)
+                Spacer(minLength: 0)
             }
 
-            HStack(spacing: 20) {
-                ValueStepper(title: "Weight", value: $set.weight, step: 2.5, range: 0...500, unit: "kg")
-                ValueStepper(title: "Reps", intValue: $set.reps, range: 0...100)
+            // Compact button/label sizing so two steppers fit side by side inside an
+            // inset-grouped Form row without clipping (default sizing is too wide here).
+            HStack(spacing: 16) {
+                ValueStepper(
+                    title: "Weight",
+                    value: $set.weight,
+                    step: 2.5,
+                    range: 0...500,
+                    unit: "kg",
+                    buttonSize: 34,
+                    valueMinWidth: 50
+                )
+                ValueStepper(
+                    title: "Reps",
+                    intValue: $set.reps,
+                    range: 0...100,
+                    buttonSize: 34,
+                    valueMinWidth: 44
+                )
             }
         }
         .padding(.vertical, 6)

@@ -28,3 +28,10 @@ extension Date {
         formatted(.dateTime.month(.wide).day().year())
     }
 }
+
+extension Date {
+    /// e.g. "Sep 16"
+    var shortDateLabel: String {
+        formatted(.dateTime.month(.abbreviated).day())
+    }
+}

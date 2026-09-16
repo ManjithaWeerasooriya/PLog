@@ -18,6 +18,9 @@ enum SampleData {
             Exercise.self,
             ExerciseEntry.self,
             SetEntry.self,
+            WorkoutPlan.self,
+            PlanDay.self,
+            PlanExercise.self,
         ])
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         do {
@@ -48,6 +51,17 @@ enum SampleData {
         return (try? context.fetch(descriptor))?.first ?? WorkoutDay(name: "Push Day")
     }
 
+    /// The seeded, currently active Push/Pull/Legs plan.
+    static var plan: WorkoutPlan {
+        let descriptor = FetchDescriptor<WorkoutPlan>()
+        return (try? context.fetch(descriptor))?.first ?? WorkoutPlan(name: "Push / Pull / Legs")
+    }
+
+    /// The plan's "Push Day" template (has exercise slots).
+    static var pushDay: PlanDay {
+        plan.orderedDays.first ?? PlanDay(name: "Push Day")
+    }
+
     // MARK: - Seeding
 
     private static func seed(into context: ModelContext) {
@@ -62,6 +76,27 @@ enum SampleData {
         let curl = Exercise(name: "Bicep Curl", category: .arms)
         [bench, squat, row, ohp, curl].forEach(context.insert)
 
+        // An active Push/Pull/Legs plan, started three weeks ago, so the log shows rest days.
+        let planStart = calendar.date(byAdding: .day, value: -21, to: today) ?? today
+        let plan = WorkoutPlan(name: "Push / Pull / Legs", startedAt: planStart)
+        context.insert(plan)
+
+        let pushDay = PlanDay(name: "Push Day", order: 0, plan: plan)
+        let pullDay = PlanDay(name: "Pull Day", order: 1, plan: plan)
+        let legDayTemplate = PlanDay(name: "Leg Day", order: 2, plan: plan)
+        [pushDay, pullDay, legDayTemplate].forEach(context.insert)
+
+        let slots: [(Exercise, PlanDay, Int, Int, Int)] = [
+            (bench, pushDay, 0, 3, 8),
+            (ohp, pushDay, 1, 3, 10),
+            (row, pullDay, 0, 3, 8),
+            (curl, pullDay, 1, 3, 12),
+            (squat, legDayTemplate, 0, 4, 5),
+        ]
+        for (exercise, day, order, sets, reps) in slots {
+            context.insert(PlanExercise(exercise: exercise, planDay: day, order: order, targetSets: sets, targetReps: reps))
+        }
+
         // Three "push" sessions showing steady progression on the bench press.
         let pushProgressions: [(daysAgo: Int, weight: Double, reps: Int)] = [
             (daysAgo: 14, weight: 60, reps: 8),
@@ -71,7 +106,7 @@ enum SampleData {
 
         for progression in pushProgressions {
             let date = calendar.date(byAdding: .day, value: -progression.daysAgo, to: today) ?? today
-            let day = WorkoutDay(date: date, name: "Push Day", notes: "")
+            let day = WorkoutDay(date: date, name: "Push Day", notes: "", planDay: pushDay)
             context.insert(day)
 
             let benchEntry = ExerciseEntry(exercise: bench, workoutDay: day, order: 0)
@@ -81,7 +116,6 @@ enum SampleData {
                     setNumber: setNumber,
                     weight: progression.weight,
                     reps: progression.reps,
-                    completed: true,
                     entry: benchEntry
                 )
                 context.insert(set)
@@ -94,7 +128,6 @@ enum SampleData {
                     setNumber: setNumber,
                     weight: 40,
                     reps: 10,
-                    completed: true,
                     entry: ohpEntry
                 )
                 context.insert(set)
@@ -103,7 +136,7 @@ enum SampleData {
 
         // A leg session for variety on the home screen.
         let legDate = calendar.date(byAdding: .day, value: -3, to: today) ?? today
-        let legDay = WorkoutDay(date: legDate, name: "Leg Day", notes: "Felt strong")
+        let legDay = WorkoutDay(date: legDate, name: "Leg Day", notes: "Felt strong", planDay: legDayTemplate)
         context.insert(legDay)
         let squatEntry = ExerciseEntry(exercise: squat, workoutDay: legDay, order: 0)
         context.insert(squatEntry)
@@ -112,7 +145,6 @@ enum SampleData {
                 setNumber: setNumber,
                 weight: 100,
                 reps: 5,
-                completed: true,
                 rpe: 8,
                 entry: squatEntry
             )
@@ -120,7 +152,5 @@ enum SampleData {
         }
 
         try? context.save()
-        _ = row
-        _ = curl
     }
 }

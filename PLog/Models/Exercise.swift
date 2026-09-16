@@ -30,6 +30,10 @@ final class Exercise {
     @Relationship(inverse: \ExerciseEntry.exercise)
     var entries: [ExerciseEntry] = []
 
+    /// Plan-template slots that reference this exercise. Nullified on delete, same reasoning.
+    @Relationship(inverse: \PlanExercise.exercise)
+    var planExercises: [PlanExercise] = []
+
     init(
         name: String,
         category: MuscleGroup = .other,

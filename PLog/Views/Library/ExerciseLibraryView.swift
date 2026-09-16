@@ -17,6 +17,10 @@ struct ExerciseLibraryView: View {
     @State private var categoryFilter: MuscleGroup?
     @State private var showingAddExercise = false
 
+    /// Exercises staged for deletion, pending the confirmation dialog below.
+    @State private var pendingDeleteExercises: [Exercise] = []
+    @State private var showingDeleteConfirmation = false
+
     var body: some View {
         NavigationStack {
             Group {
@@ -43,6 +47,16 @@ struct ExerciseLibraryView: View {
             .sheet(isPresented: $showingAddExercise) {
                 AddExerciseView()
             }
+            .confirmationDialog(
+                deleteConfirmationTitle,
+                isPresented: $showingDeleteConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Delete", role: .destructive, action: confirmDelete)
+                Button("Cancel", role: .cancel) { pendingDeleteExercises = [] }
+            } message: {
+                Text("Logged sets that used it are kept, just no longer linked to an exercise.")
+            }
         }
     }
 
@@ -60,7 +74,7 @@ struct ExerciseLibraryView: View {
                         }
                     }
                     .onDelete { offsets in
-                        delete(from: section.items, at: offsets)
+                        requestDelete(from: section.items, at: offsets)
                     }
                 } header: {
                     Label(section.group.displayName, systemImage: section.group.systemImage)
@@ -127,11 +141,25 @@ struct ExerciseLibraryView: View {
         }
     }
 
-    private func delete(from items: [Exercise], at offsets: IndexSet) {
-        for index in offsets {
-            context.delete(items[index])
+    private func requestDelete(from items: [Exercise], at offsets: IndexSet) {
+        pendingDeleteExercises = offsets.map { items[$0] }
+        showingDeleteConfirmation = true
+    }
+
+    private func confirmDelete() {
+        for exercise in pendingDeleteExercises {
+            context.delete(exercise)
         }
+        pendingDeleteExercises = []
         try? context.save()
+    }
+
+    private var deleteConfirmationTitle: String {
+        if pendingDeleteExercises.count == 1 {
+            let name = pendingDeleteExercises[0].name
+            return "Delete “\(name.isEmpty ? "Exercise" : name)”?"
+        }
+        return "Delete \(pendingDeleteExercises.count) Exercises?"
     }
 }
 

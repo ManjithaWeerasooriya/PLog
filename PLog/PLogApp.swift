@@ -18,6 +18,9 @@ struct PLogApp: App {
             Exercise.self,
             ExerciseEntry.self,
             SetEntry.self,
+            WorkoutPlan.self,
+            PlanDay.self,
+            PlanExercise.self,
         ])
         do {
             return try ModelContainer(for: schema)

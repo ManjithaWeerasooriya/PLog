@@ -2,7 +2,8 @@
 //  SetEntry.swift
 //  PLog
 //
-//  A single set within an `ExerciseEntry`: the weight, reps, and completion state.
+//  A single set within an `ExerciseEntry`: the weight and reps. Its existence in the list
+//  IS the "added" state — there's no separate completion toggle.
 //
 
 import Foundation
@@ -19,9 +20,6 @@ final class SetEntry {
     /// Number of repetitions performed.
     var reps: Int
 
-    /// Whether the set has been completed (for live in-session ticking).
-    var completed: Bool
-
     /// Optional Rate of Perceived Exertion (typically 1...10).
     var rpe: Double?
 
@@ -35,7 +33,6 @@ final class SetEntry {
         setNumber: Int,
         weight: Double = 0,
         reps: Int = 0,
-        completed: Bool = false,
         rpe: Double? = nil,
         notes: String? = nil,
         entry: ExerciseEntry? = nil
@@ -43,7 +40,6 @@ final class SetEntry {
         self.setNumber = setNumber
         self.weight = weight
         self.reps = reps
-        self.completed = completed
         self.rpe = rpe
         self.notes = notes
         self.entry = entry

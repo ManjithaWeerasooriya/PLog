@@ -2,7 +2,7 @@
 //  ContentView.swift
 //  PLog
 //
-//  Root tab bar: your logged workout days on one tab, the reusable exercise library on the other.
+//  Root tab bar: logged workout days, your training plans, and the reusable exercise library.
 //
 
 import SwiftUI
@@ -14,6 +14,11 @@ struct ContentView: View {
             HomeView()
                 .tabItem {
                     Label("Workouts", systemImage: "calendar")
+                }
+
+            PlanListView()
+                .tabItem {
+                    Label("Plans", systemImage: "list.clipboard")
                 }
 
             ExerciseLibraryView()

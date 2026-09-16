@@ -1,0 +1,167 @@
+//
+//  PlanListView.swift
+//  PLog
+//
+//  The Plans tab: the currently active plan on top, every other plan below. Tap "+" to
+//  create a plan and jump straight into editing it.
+//
+
+import SwiftUI
+import SwiftData
+
+/// Non-model screens reachable in the Plans stack. Everything is pushed by value so that
+/// value-based links keep working from any depth (a view-builder `NavigationLink` would
+/// leave its destination outside the path and break `NavigationLink(value:)` inside it).
+enum PlanRoute: Hashable {
+    case log(WorkoutPlan)
+}
+
+struct PlanListView: View {
+    @Environment(\.modelContext) private var context
+
+    @Query(sort: \WorkoutPlan.createdAt, order: .reverse) private var plans: [WorkoutPlan]
+
+    /// Mixed-type path: plans, day templates, and logged workout days all push onto it.
+    @State private var path = NavigationPath()
+
+    /// Plans staged for deletion, pending the confirmation dialog below.
+    @State private var pendingDeletePlans: [WorkoutPlan] = []
+    @State private var showingDeleteConfirmation = false
+    /// Shown instead of the confirmation dialog when a swipe targets the active plan.
+    @State private var showingActivePlanBlockedAlert = false
+
+    var body: some View {
+        NavigationStack(path: $path) {
+            Group {
+                if plans.isEmpty {
+                    emptyState
+                } else {
+                    planList
+                }
+            }
+            .navigationTitle("Plans")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button(action: createPlan) {
+                        Label("New Plan", systemImage: "plus")
+                    }
+                }
+            }
+            .navigationDestination(for: WorkoutPlan.self) { plan in
+                PlanDetailView(plan: plan, context: context)
+            }
+            .navigationDestination(for: PlanDay.self) { day in
+                PlanDayDetailView(day: day)
+            }
+            .navigationDestination(for: WorkoutDay.self) { day in
+                DayDetailView(day: day)
+            }
+            .navigationDestination(for: PlanRoute.self) { route in
+                switch route {
+                case .log(let plan):
+                    PlanLogView(plan: plan, context: context, path: $path)
+                }
+            }
+            .confirmationDialog(
+                deleteConfirmationTitle,
+                isPresented: $showingDeleteConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Delete", role: .destructive, action: confirmDelete)
+                Button("Cancel", role: .cancel) { pendingDeletePlans = [] }
+            } message: {
+                Text("This removes its day templates. Workouts you've already logged are kept.")
+            }
+            .alert("Can't Delete an Active Plan", isPresented: $showingActivePlanBlockedAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("End the plan before deleting it.")
+            }
+        }
+    }
+
+    // MARK: - Subviews
+
+    private var planList: some View {
+        List {
+            if !activePlans.isEmpty {
+                Section("Active") {
+                    ForEach(activePlans) { plan in
+                        NavigationLink(value: plan) {
+                            WorkoutPlanRow(plan: plan)
+                        }
+                    }
+                    .onDelete { offsets in requestDelete(from: activePlans, at: offsets) }
+                }
+            }
+            if !otherPlans.isEmpty {
+                Section(activePlans.isEmpty ? "All Plans" : "Other Plans") {
+                    ForEach(otherPlans) { plan in
+                        NavigationLink(value: plan) {
+                            WorkoutPlanRow(plan: plan)
+                        }
+                    }
+                    .onDelete { offsets in requestDelete(from: otherPlans, at: offsets) }
+                }
+            }
+        }
+    }
+
+    private var emptyState: some View {
+        ContentUnavailableView {
+            Label("No Plans Yet", systemImage: "list.clipboard")
+        } description: {
+            Text("Build a plan of days like Push, Pull and Legs, then start it to log against it.")
+        } actions: {
+            Button("Create a Plan", action: createPlan)
+                .buttonStyle(.borderedProminent)
+        }
+    }
+
+    // MARK: - Grouping
+
+    private var activePlans: [WorkoutPlan] { plans.filter(\.isActive) }
+    private var otherPlans: [WorkoutPlan] { plans.filter { !$0.isActive } }
+
+    // MARK: - Actions
+
+    private func createPlan() {
+        let plan = WorkoutPlan(name: "New Plan")
+        context.insert(plan)
+        try? context.save()
+        path.append(plan)
+    }
+
+    /// Stages the swiped plans for deletion, unless one of them is currently active — an
+    /// active plan must be ended first so it can't be lost mid-program by accident.
+    private func requestDelete(from sectionPlans: [WorkoutPlan], at offsets: IndexSet) {
+        let targeted = offsets.map { sectionPlans[$0] }
+        guard !targeted.contains(where: \.isActive) else {
+            showingActivePlanBlockedAlert = true
+            return
+        }
+        pendingDeletePlans = targeted
+        showingDeleteConfirmation = true
+    }
+
+    private func confirmDelete() {
+        for plan in pendingDeletePlans {
+            context.delete(plan)
+        }
+        pendingDeletePlans = []
+        try? context.save()
+    }
+
+    private var deleteConfirmationTitle: String {
+        if pendingDeletePlans.count == 1 {
+            let name = pendingDeletePlans[0].name
+            return "Delete “\(name.isEmpty ? "Plan" : name)”?"
+        }
+        return "Delete \(pendingDeletePlans.count) Plans?"
+    }
+}
+
+#Preview {
+    PlanListView()
+        .modelContainer(SampleData.container)
+}

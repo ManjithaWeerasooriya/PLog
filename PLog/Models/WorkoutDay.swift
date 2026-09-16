@@ -20,6 +20,10 @@ final class WorkoutDay {
     /// Freeform notes for the whole session (how you felt, sleep, etc.).
     var notes: String
 
+    /// The plan template this session was logged from, if any. Plain (non-cascading)
+    /// reference; the inverse lives on `PlanDay.loggedDays`.
+    var planDay: PlanDay?
+
     /// The exercises logged during this session.
     ///
     /// Cascade delete: removing a `WorkoutDay` removes its `ExerciseEntry` rows (and, in turn,
@@ -30,11 +34,13 @@ final class WorkoutDay {
     init(
         date: Date = .now,
         name: String = "",
-        notes: String = ""
+        notes: String = "",
+        planDay: PlanDay? = nil
     ) {
         self.date = date
         self.name = name
         self.notes = notes
+        self.planDay = planDay
     }
 
     /// Entries in a stable, user-defined order.
