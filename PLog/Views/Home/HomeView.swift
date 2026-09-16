@@ -2,8 +2,9 @@
 //  HomeView.swift
 //  PLog
 //
-//  The app's home screen: a reverse-chronological list of logged workout days, grouped by
-//  month. Tap a day to view/edit it; tap "+" to start a new session.
+//  The Logs tab: a reverse-chronological list of logged sessions, grouped by month. Tap a
+//  session to view/edit it. "+" offers the active plan's days (pre-filled from the template)
+//  or a blank workout.
 //
 
 import SwiftUI
@@ -12,11 +13,24 @@ import SwiftData
 struct HomeView: View {
     @Environment(\.modelContext) private var context
 
-    /// All logged days, newest first. `@Query` keeps this list live as data changes.
+    /// All logged sessions, newest first. `@Query` keeps this list live as data changes.
     @Query(sort: \WorkoutDay.date, order: .reverse) private var days: [WorkoutDay]
 
-    /// Navigation path so we can push a freshly-created day straight into its detail screen.
+    /// At most one plan is active at a time (starting one ends the others), so `first` is safe.
+    @Query private var plans: [WorkoutPlan]
+
+    /// Navigation path so we can push a freshly-created session straight into its detail screen.
     @State private var path: [WorkoutDay] = []
+
+    private var activePlan: WorkoutPlan? {
+        plans.first(where: \.isActive)
+    }
+
+    /// The active plan, only if it actually has days to log against.
+    private var loggablePlan: WorkoutPlan? {
+        guard let plan = activePlan, !plan.days.isEmpty else { return nil }
+        return plan
+    }
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -27,11 +41,11 @@ struct HomeView: View {
                     dayList
                 }
             }
-            .navigationTitle("Workouts")
+            .navigationTitle("Logs")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button(action: startNewWorkout) {
-                        Label("New Workout", systemImage: "plus")
+                    newLogControl {
+                        Label("Log Workout", systemImage: "plus")
                     }
                 }
             }
@@ -62,12 +76,56 @@ struct HomeView: View {
 
     private var emptyState: some View {
         ContentUnavailableView {
-            Label("No Workouts Yet", systemImage: "figure.strengthtraining.traditional")
+            Label("No Logs Yet", systemImage: "figure.strengthtraining.traditional")
         } description: {
-            Text("Tap + to log your first session and start tracking progressive overload.")
+            if loggablePlan != nil {
+                Text("Pick a day from your plan and its exercises and sets are filled in — you just update the weights.")
+            } else {
+                Text("Log your first session to start tracking progressive overload. Start a plan to have sessions pre-filled.")
+            }
         } actions: {
-            Button("Start a Workout", action: startNewWorkout)
-                .buttonStyle(.borderedProminent)
+            newLogControl {
+                Text("Log a Workout")
+            }
+            .buttonStyle(.borderedProminent)
+        }
+    }
+
+    /// A menu of the active plan's days (plus "Blank Workout"), or a plain button when
+    /// there's no active plan to log against.
+    @ViewBuilder
+    private func newLogControl<L: View>(@ViewBuilder label: () -> L) -> some View {
+        if let plan = loggablePlan {
+            Menu {
+                planDayButtons(for: plan)
+            } label: {
+                label()
+            }
+        } else {
+            Button(action: startBlankWorkout, label: label)
+        }
+    }
+
+    @ViewBuilder
+    private func planDayButtons(for plan: WorkoutPlan) -> some View {
+        let next = WorkoutLogger.suggestedNextDay(in: plan)
+        Section(plan.name.isEmpty ? "Plan" : plan.name) {
+            ForEach(plan.orderedDays) { day in
+                Button {
+                    log(day)
+                } label: {
+                    if day === next {
+                        Label("\(day.name) · Up next", systemImage: "arrow.right.circle.fill")
+                    } else {
+                        Text(day.name.isEmpty ? "Day" : day.name)
+                    }
+                }
+            }
+        }
+        Button {
+            startBlankWorkout()
+        } label: {
+            Label("Blank Workout", systemImage: "square.dashed")
         }
     }
 
@@ -78,7 +136,7 @@ struct HomeView: View {
         let days: [WorkoutDay]
     }
 
-    /// Groups days into month sections (e.g. "September 2026"), preserving newest-first order.
+    /// Groups sessions into month sections (e.g. "September 2026"), preserving newest-first order.
     private var groupedDays: [DaySection] {
         let groups = Dictionary(grouping: days) { day in
             day.date.formatted(.dateTime.month(.wide).year())
@@ -90,7 +148,13 @@ struct HomeView: View {
 
     // MARK: - Actions
 
-    private func startNewWorkout() {
+    /// Stamps the plan day's template into a new session and opens it.
+    private func log(_ planDay: PlanDay) {
+        let day = WorkoutLogger.logWorkout(for: planDay, in: context)
+        path.append(day)
+    }
+
+    private func startBlankWorkout() {
         let day = WorkoutDay(date: .now, name: "New Workout")
         context.insert(day)
         try? context.save()

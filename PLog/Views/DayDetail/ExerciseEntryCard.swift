@@ -14,7 +14,14 @@ struct ExerciseEntryCard: View {
     /// Called when the user taps "Edit" to open the quick-entry editor.
     var onEdit: () -> Void
 
-    @State private var isExpanded = false
+    @State private var isExpanded: Bool
+
+    /// Plan-logged sessions start expanded so every pre-filled set is visible at a glance.
+    init(entry: ExerciseEntry, initiallyExpanded: Bool = false, onEdit: @escaping () -> Void) {
+        self.entry = entry
+        self.onEdit = onEdit
+        _isExpanded = State(initialValue: initiallyExpanded)
+    }
 
     /// The previous session's top set, cached for per-set comparisons.
     private var previousTopSet: SetSnapshot? {

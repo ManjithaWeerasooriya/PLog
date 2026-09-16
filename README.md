@@ -4,11 +4,12 @@ An iOS workout tracker built for progressive overload. Log your sets per exercis
 
 ## Features
 
-- **Log workouts** — record weight × reps per set for each exercise in a session, grouped by day
+- **Log workouts** — pick a day from your active plan and the session is created with every exercise and set pre-filled; you only update the weights. Or start from a blank workout
 - **Progressive overload at a glance** — every set is compared against your last session using estimated one-rep max (Epley formula), so trading weight for reps (or vice versa) is still recognized as progress
 - **Exercise library** — a reusable master list of exercises, organized by muscle group, with per-exercise history charts
 - **Workout plans** — build a rotation of day templates (Push, Pull, Legs, …), each pre-filled with target sets × reps per exercise; start a plan to begin logging against it and end it when the program is over
 - **Workout log** — a day-by-day timeline for an active plan, with gaps between sessions labeled as rest days
+- **Starter content** — first launch seeds an exercise library and two sample plans (Push / Pull / Legs, Upper / Lower) so you can try it immediately
 
 ## Requirements
 
@@ -29,4 +30,4 @@ PLog is a SwiftUI + SwiftData app following MVVM, with `@Query`-driven read scre
 
 ## License
 
-No license has been chosen yet — all rights reserved by default.
+MIT — see [LICENSE](LICENSE).

@@ -23,7 +23,10 @@ struct PLogApp: App {
             PlanExercise.self,
         ])
         do {
-            return try ModelContainer(for: schema)
+            let container = try ModelContainer(for: schema)
+            // First launch only: a starter exercise library and sample plans to log against.
+            StarterData.seedIfNeeded(in: container.mainContext)
+            return container
         } catch {
             fatalError("Failed to create ModelContainer: \(error)")
         }

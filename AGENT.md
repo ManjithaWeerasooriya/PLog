@@ -28,7 +28,7 @@ PLog/                        ← repo root
 │   └── project.pbxproj      ← uses PBXFileSystemSynchronizedRootGroup (see below)
 └── PLog/                    ← all Swift source lives here
     ├── PLogApp.swift         ← @main entry point, ModelContainer init
-    ├── ContentView.swift     ← root TabView (Workouts + Plans + Exercises tabs)
+    ├── ContentView.swift     ← root TabView (Logs + Plans + Exercises tabs)
     ├── Models/
     │   ├── MuscleGroup.swift        ← Codable enum, drives category chips + chart colors
     │   ├── Exercise.swift           ← reusable master-list exercise
@@ -49,8 +49,8 @@ PLog/                        ← repo root
     │   │   ├── ValueStepper.swift   ← +/- stepper for weight (Double) and reps (Int)
     │   │   └── TrendBadge.swift     ← green/red/gray capsule pill; CategoryChip
     │   ├── Home/
-    │   │   ├── HomeView.swift       ← workout list grouped by month, NavigationStack
-    │   │   └── WorkoutDayRow.swift  ← one row: name, date, exercise summary
+    │   │   ├── HomeView.swift       ← Logs tab: sessions by month; "+" picks a plan day
+    │   │   └── WorkoutDayRow.swift  ← one row: name, date, plan tag, exercise summary
     │   ├── DayDetail/
     │   │   ├── DayDetailView.swift       ← editable session header + exercise list
     │   │   └── ExerciseEntryCard.swift   ← collapsible card per exercise
@@ -73,7 +73,9 @@ PLog/                        ← repo root
     └── Utilities/
         ├── ProgressiveOverload.swift ← SetSnapshot, ProgressTrend, overload logic
         ├── WorkoutHistory.swift      ← read-only helpers: previousEntry, historyPoints
+        ├── WorkoutLogger.swift       ← stamps a PlanDay into a WorkoutDay; suggestedNextDay
         ├── PlanTimeline.swift        ← builds PlanLogItem rows (sessions + rest days)
+        ├── StarterData.swift         ← first-launch seed: exercise library + 2 sample plans
         ├── Formatters.swift          ← WeightFormatter, Date extensions
         └── SampleData.swift          ← in-memory ModelContainer for SwiftUI previews
 ```
@@ -152,9 +154,17 @@ Do not deviate from this pattern. Do not try to capture `@Environment` in an `in
 
 `PlanListView` owns a `NavigationPath` (mixed types: `WorkoutPlan`, `PlanDay`, `WorkoutDay`, `PlanRoute`) and registers every `navigationDestination(for:)` at the stack root. **Push everything by value** in this stack. A view-builder `NavigationLink { … }` leaves its destination outside the path and `NavigationLink(value:)` rows inside it silently do nothing (row highlights, no push) — that's why the log screen is reached via `PlanRoute.log(plan)`. Screens that need to push programmatically (`PlanLogView` after logging) take `path: Binding<NavigationPath>`.
 
-### Plans → sessions
+### Plans → sessions (the Logs tab)
 
-`WorkoutPlanViewModel.logWorkout(for:on:)` stamps a `PlanDay` template into a `WorkoutDay`: one `ExerciseEntry` per slot with `targetSets` sets at `targetReps`, weight prefilled from `WorkoutHistory.previousTopSet`. `PlanTimeline.items(for:workouts:)` produces the log rows: every calendar day from `startedAt` to `endedAt ?? today`; days with no session are rest days (today is shown as "Not logged yet" instead). Starting a plan ends any other active plan.
+`WorkoutLogger.logWorkout(for:on:in:)` stamps a `PlanDay` template into a `WorkoutDay`: one `ExerciseEntry` per slot with `targetSets` sets at `targetReps`, weight prefilled from `WorkoutHistory.previousTopSet` — so logging a plan day means only adjusting weights. It's called from two places that must stay in sync: the **Logs tab** (`HomeView`'s "+" is a `Menu` of the active plan's days, with `WorkoutLogger.suggestedNextDay` flagged "Up next", plus "Blank Workout"; it's a plain button when no plan is active) and the plan's own log screen via `WorkoutPlanViewModel`. `DayDetailView` shows a "Plan Day" row for stamped sessions and passes `initiallyExpanded: true` to their cards.
+
+`PlanTimeline.items(for:workouts:)` produces the plan log rows: every calendar day from `startedAt` to `endedAt ?? today`; days with no session are rest days (today is shown as "Not logged yet" instead).
+
+**Exactly one plan can be active.** `WorkoutPlanViewModel.start()` fetches every plan and sets `endedAt` on any other active one before starting this one. `HomeView` relies on this (`plans.first(where: \.isActive)`). Don't add another code path that sets `startedAt` without going through `start()`.
+
+### First-launch starter data
+
+`PLogApp` calls `StarterData.seedIfNeeded(in:)` right after building the container. It seeds only when there are **zero** `Exercise` rows: a 20-exercise library across all muscle groups, an active "Push / Pull / Legs" plan (3 days, 5 slots each) and a not-started "Upper / Lower" plan. It never touches a store that already has data. This is distinct from `SampleData`, which is the in-memory preview fixture and also seeds workout history.
 
 ### Destructive actions confirm first
 

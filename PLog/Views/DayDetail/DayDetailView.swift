@@ -50,6 +50,12 @@ struct DayDetailView: View {
             TextField("Workout name", text: $day.name)
                 .font(.headline)
             DatePicker("Date", selection: $day.date, displayedComponents: .date)
+            if let planDay = day.planDay {
+                LabeledContent("Plan Day") {
+                    Text(planDayLabel(planDay))
+                        .foregroundStyle(.secondary)
+                }
+            }
             TextField("Notes", text: $day.notes, axis: .vertical)
                 .lineLimit(1...4)
         }
@@ -68,7 +74,7 @@ struct DayDetailView: View {
         } else {
             Section("Exercises") {
                 ForEach(day.orderedEntries) { entry in
-                    ExerciseEntryCard(entry: entry) {
+                    ExerciseEntryCard(entry: entry, initiallyExpanded: day.planDay != nil) {
                         editingEntry = entry
                     }
                     .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
@@ -77,6 +83,13 @@ struct DayDetailView: View {
                 .onDelete(perform: deleteEntries)
             }
         }
+    }
+
+    /// e.g. "Push Day · Push / Pull / Legs".
+    private func planDayLabel(_ planDay: PlanDay) -> String {
+        let dayName = planDay.name.isEmpty ? "Day" : planDay.name
+        guard let planName = planDay.plan?.name, !planName.isEmpty else { return dayName }
+        return "\(dayName) · \(planName)"
     }
 
     // MARK: - Actions

@@ -2,7 +2,7 @@
 //  ContentView.swift
 //  PLog
 //
-//  Root tab bar: logged workout days, your training plans, and the reusable exercise library.
+//  Root tab bar: your session logs, your training plans, and the reusable exercise library.
 //
 
 import SwiftUI
@@ -13,7 +13,7 @@ struct ContentView: View {
         TabView {
             HomeView()
                 .tabItem {
-                    Label("Workouts", systemImage: "calendar")
+                    Label("Logs", systemImage: "list.bullet.rectangle")
                 }
 
             PlanListView()

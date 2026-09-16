@@ -23,19 +23,9 @@ final class WorkoutPlanViewModel {
 
     var days: [PlanDay] { plan.orderedDays }
 
-    /// The template to suggest next: the one after the most recently logged day in the
-    /// rotation (wrapping), or the first day if nothing has been logged yet.
+    /// The template to suggest next in the rotation.
     var suggestedNextDay: PlanDay? {
-        let ordered = days
-        guard !ordered.isEmpty else { return nil }
-        let lastLogged = ordered
-            .flatMap(\.loggedDays)
-            .max { $0.date < $1.date }
-        guard
-            let lastDay = lastLogged?.planDay,
-            let index = ordered.firstIndex(where: { $0 === lastDay })
-        else { return ordered.first }
-        return ordered[(index + 1) % ordered.count]
+        WorkoutLogger.suggestedNextDay(in: plan)
     }
 
     // MARK: - Lifecycle
@@ -97,34 +87,10 @@ final class WorkoutPlanViewModel {
 
     // MARK: - Logging
 
-    /// Creates a `WorkoutDay` from a template: one entry per exercise slot, each with
-    /// `targetSets` sets at `targetReps`, and the weight prefilled from the last session.
+    /// Stamps a template into a new session. See `WorkoutLogger.logWorkout`.
     @discardableResult
     func logWorkout(for planDay: PlanDay, on date: Date = .now) -> WorkoutDay {
-        let day = WorkoutDay(date: date, name: planDay.name)
-        context.insert(day)
-        planDay.loggedDays.append(day)
-
-        for (order, slot) in planDay.orderedExercises.enumerated() {
-            guard let exercise = slot.exercise else { continue }
-            let entry = ExerciseEntry(exercise: exercise, order: order)
-            context.insert(entry)
-            day.entries.append(entry)
-
-            let lastWeight = WorkoutHistory.previousTopSet(for: exercise, excluding: entry)?.weight ?? 0
-            for setNumber in stride(from: 1, through: slot.targetSets, by: 1) {
-                let set = SetEntry(
-                    setNumber: setNumber,
-                    weight: lastWeight,
-                    reps: slot.targetReps
-                )
-                context.insert(set)
-                entry.sets.append(set)
-            }
-        }
-
-        save()
-        return day
+        WorkoutLogger.logWorkout(for: planDay, on: date, in: context)
     }
 
     func save() {

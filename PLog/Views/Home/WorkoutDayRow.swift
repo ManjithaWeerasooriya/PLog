@@ -32,6 +32,15 @@ struct WorkoutDayRow: View {
             .font(.caption)
             .foregroundStyle(.secondary)
 
+            // Sessions stamped from a plan show which one, on their own line so the
+            // counts above never wrap.
+            if let planDay = day.planDay {
+                Label(planLabel(for: planDay), systemImage: "list.clipboard")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
             if !day.entries.isEmpty {
                 Text(exerciseSummary)
                     .font(.caption)
@@ -40,6 +49,13 @@ struct WorkoutDayRow: View {
             }
         }
         .padding(.vertical, 4)
+    }
+
+    /// e.g. "Push / Pull / Legs · Push Day".
+    private func planLabel(for planDay: PlanDay) -> String {
+        let dayName = planDay.name.isEmpty ? "Day" : planDay.name
+        guard let planName = planDay.plan?.name, !planName.isEmpty else { return dayName }
+        return "\(planName) · \(dayName)"
     }
 
     /// A compact "Bench Press · Overhead Press" preview of the day's exercises.
