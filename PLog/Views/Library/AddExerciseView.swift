@@ -13,17 +13,28 @@ struct AddExerciseView: View {
     @Environment(\.modelContext) private var context
 
     /// The exercise being edited. `nil` means this is the "New Exercise" flow.
-    var exercise: Exercise? = nil
-    var prefilledName: String = ""
+    let exercise: Exercise?
     /// Optional callback fired with the newly created (or edited) exercise (used by the
     /// picker flow to select whatever the user just made).
-    var onCreate: ((Exercise) -> Void)? = nil
+    let onCreate: ((Exercise) -> Void)?
 
-    @State private var name: String = ""
-    @State private var category: MuscleGroup = .chest
-    @State private var notes: String = ""
+    @State private var name: String
+    @State private var category: MuscleGroup
+    @State private var notes: String
 
     private var isEditing: Bool { exercise != nil }
+
+    /// Seeds the `@State` once, here, rather than in `.onAppear` — `.onAppear` re-fires when
+    /// the "Muscle Group" navigation-link picker is popped back to this screen (the view
+    /// "reappears"), which was stomping the just-picked `category` back to the exercise's
+    /// original stored value before the user ever saw the change stick.
+    init(exercise: Exercise? = nil, prefilledName: String = "", onCreate: ((Exercise) -> Void)? = nil) {
+        self.exercise = exercise
+        self.onCreate = onCreate
+        _name = State(initialValue: exercise?.name ?? prefilledName)
+        _category = State(initialValue: exercise?.category ?? .chest)
+        _notes = State(initialValue: exercise?.notes ?? "")
+    }
 
     var body: some View {
         NavigationStack {
@@ -59,22 +70,11 @@ struct AddExerciseView: View {
                         .disabled(trimmedName.isEmpty)
                 }
             }
-            .onAppear(perform: populateFromExistingExercise)
         }
     }
 
     private var trimmedName: String {
         name.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private func populateFromExistingExercise() {
-        guard let exercise else {
-            if name.isEmpty { name = prefilledName }
-            return
-        }
-        name = exercise.name
-        category = exercise.category
-        notes = exercise.notes
     }
 
     private func save() {
