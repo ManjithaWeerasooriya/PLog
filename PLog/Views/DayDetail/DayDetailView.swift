@@ -2,8 +2,9 @@
 //  DayDetailView.swift
 //  PLog
 //
-//  Shows one workout day: editable name/notes plus the exercises logged, each an
-//  expandable card. Add exercises from the master library and jump into quick entry.
+//  Shows one workout day: editable name/notes plus the exercises logged, each collapsible
+//  (accordion-style, one open at a time). Add exercises from the master library and jump
+//  into quick entry.
 //
 
 import SwiftUI
@@ -18,6 +19,9 @@ struct DayDetailView: View {
     @State private var showingExercisePicker = false
     /// The entry currently open in the quick-entry editor (drives the sheet).
     @State private var editingEntry: ExerciseEntry?
+    /// The one exercise currently expanded (accordion-style — see `ExerciseEntryCard`).
+    /// Starts `nil` so every exercise opens collapsed, matching the set list's behavior.
+    @State private var expandedEntryID: PersistentIdentifier?
 
     var body: some View {
         List {
@@ -74,15 +78,20 @@ struct DayDetailView: View {
         } else {
             Section("Exercises") {
                 ForEach(day.orderedEntries) { entry in
-                    ExerciseEntryCard(entry: entry, initiallyExpanded: day.planDay != nil) {
+                    ExerciseEntryCard(entry: entry, isExpanded: isExpanded(entry)) {
                         editingEntry = entry
                     }
-                    .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
-                    .listRowSeparator(.hidden)
                 }
                 .onDelete(perform: deleteEntries)
             }
         }
+    }
+
+    private func isExpanded(_ entry: ExerciseEntry) -> Binding<Bool> {
+        Binding(
+            get: { expandedEntryID == entry.persistentModelID },
+            set: { expanded in expandedEntryID = expanded ? entry.persistentModelID : nil }
+        )
     }
 
     /// e.g. "Push Day · Push / Pull / Legs".

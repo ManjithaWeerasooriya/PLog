@@ -276,9 +276,11 @@ For an `Int?`/`Double?` model field (`UserProfile.age`/`heightCm`/`weightKg`), b
 
 Two wheels side by side in one row (`SetEditorRow`, `PlanExerciseRow`) fit comfortably at their default sizing; this replaced the old `ValueStepper` (+/- buttons), which needed hand-tuned compact sizing to avoid clipping at this width and has been deleted.
 
-### Sets are collapsible, accordion-style
+### Sets and exercise cards are collapsible, accordion-style — same pattern, same look
 
-`SetEditorRow` takes `isExpanded: Binding<Bool>` rather than owning its own `@State` — collapsed it shows a `"62.5kg × 8"` summary; expanded it reveals the weight/reps wheels. `AddEditExerciseEntryView` holds a single `expandedSetID: PersistentIdentifier?` and hands each row a computed `Binding` that compares against it, so **only one set is ever expanded at a time**. It seeds `expandedSetID` to the first set's ID in `init` (so opening the sheet needs no extra tap to adjust the set you almost certainly care about), and re-points it at the new set whenever "Duplicate Last Set" runs. Follow this pattern — a shared "which one is open" ID on the parent, not per-row state — for any other accordion-style list.
+Both `SetEditorRow` (inside `AddEditExerciseEntryView`) and `ExerciseEntryCard` (inside `DayDetailView`) take `isExpanded: Binding<Bool>` rather than owning their own `@State`. The parent holds a single `expanded…ID: PersistentIdentifier?` and hands each row a computed `Binding` that compares against it, so **only one row is ever expanded at a time** in either list. Both start with everything collapsed (`AddEditExerciseEntryView` is the one exception — it seeds `expandedSetID` to the first set's ID in `init` so opening the sheet needs no extra tap to adjust the set you almost certainly care about, and re-points it whenever "Duplicate Last Set" runs; `DayDetailView`'s `expandedEntryID` starts `nil` unconditionally, including for plan-logged sessions that used to auto-expand every card — don't reintroduce that).
+
+Visually, both lists are **plain rows inside one shared `Section`** — a header (name/summary + trailing chevron that rotates on expand) that reveals more content below when tapped, no per-row card background or hidden separators. `ExerciseEntryCard` used to render each exercise as its own floating rounded-rect card (`.background(...,  in: RoundedRectangle(...))`, `.listRowSeparator(.hidden)`); that's gone specifically so the exercises list in `DayDetailView` matches the sets list's look. Keep any new expandable list in this style — a shared `Section`, `Binding`-driven per-row expansion, no individual card chrome — rather than reinventing a bespoke card look.
 
 ---
 

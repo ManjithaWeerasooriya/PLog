@@ -2,8 +2,10 @@
 //  ExerciseEntryCard.swift
 //  PLog
 //
-//  An expandable card for one exercise on a workout day. Collapsed it shows a summary;
-//  expanded it lists each set with a progressive-overload badge versus the previous session.
+//  One exercise on a workout day, collapsed to a summary by default. Tap it to reveal each
+//  set with a progressive-overload badge versus the previous session. Styled and behaved
+//  the same as `SetEditorRow` — a plain row in the enclosing List section (not its own
+//  floating card), expansion controlled by the parent so only one exercise is open at a time.
 //
 
 import SwiftUI
@@ -11,17 +13,11 @@ import SwiftData
 
 struct ExerciseEntryCard: View {
     let entry: ExerciseEntry
+    /// Controlled by the parent so only one exercise is expanded at a time (accordion-style)
+    /// — see `DayDetailView`.
+    @Binding var isExpanded: Bool
     /// Called when the user taps "Edit" to open the quick-entry editor.
     var onEdit: () -> Void
-
-    @State private var isExpanded: Bool
-
-    /// Plan-logged sessions start expanded so every pre-filled set is visible at a glance.
-    init(entry: ExerciseEntry, initiallyExpanded: Bool = false, onEdit: @escaping () -> Void) {
-        self.entry = entry
-        self.onEdit = onEdit
-        _isExpanded = State(initialValue: initiallyExpanded)
-    }
 
     /// The previous session's top set, cached for per-set comparisons.
     private var previousTopSet: SetSnapshot? {
@@ -29,8 +25,8 @@ struct ExerciseEntryCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // Only the header toggles expansion; a card-wide tap gesture would swallow the
+        VStack(alignment: .leading, spacing: 8) {
+            // Only the header toggles expansion; a row-wide tap gesture would swallow the
             // Edit/History buttons below.
             header
                 .contentShape(Rectangle())
@@ -44,8 +40,7 @@ struct ExerciseEntryCard: View {
                 actionRow
             }
         }
-        .padding()
-        .background(.background.secondary, in: RoundedRectangle(cornerRadius: 14))
+        .padding(.vertical, 4)
     }
 
     // MARK: - Header
@@ -130,11 +125,20 @@ struct ExerciseEntryCard: View {
 }
 
 #Preview {
-    NavigationStack {
-        ScrollView {
-            ExerciseEntryCard(entry: SampleData.recentDay.orderedEntries.first!, onEdit: {})
-                .padding()
+    struct Demo: View {
+        @State private var isExpanded = true
+        var body: some View {
+            NavigationStack {
+                List {
+                    ExerciseEntryCard(
+                        entry: SampleData.recentDay.orderedEntries.first!,
+                        isExpanded: $isExpanded,
+                        onEdit: {}
+                    )
+                }
+            }
+            .modelContainer(SampleData.container)
         }
     }
-    .modelContainer(SampleData.container)
+    return Demo()
 }
