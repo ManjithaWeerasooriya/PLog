@@ -11,6 +11,14 @@ import SwiftData
 
 struct PlanDetailView: View {
     @State private var viewModel: WorkoutPlanViewModel
+    private let context: ModelContext
+
+    /// True when this screen was pushed straight from tapping "+" (see `PlanRoute.newPlan`).
+    /// The plan is already inserted and saved at that point, so backing out with nothing
+    /// added would otherwise leave a phantom empty plan behind — this flag makes the back
+    /// button offer to discard it instead. Normal navigation to an existing plan (a row tap)
+    /// leaves this `false`.
+    private let isNewlyCreated: Bool
 
     @State private var showingAddDay = false
     @State private var newDayName = ""
@@ -22,8 +30,10 @@ struct PlanDetailView: View {
     @State private var originalNotes: String
 
     /// Context is passed in explicitly because `@Environment` isn't available during `init`.
-    init(plan: WorkoutPlan, context: ModelContext) {
+    init(plan: WorkoutPlan, context: ModelContext, isNewlyCreated: Bool = false) {
         _viewModel = State(initialValue: WorkoutPlanViewModel(plan: plan, context: context))
+        self.context = context
+        self.isNewlyCreated = isNewlyCreated
         _originalName = State(initialValue: plan.name)
         _originalNotes = State(initialValue: plan.notes)
     }
@@ -91,8 +101,15 @@ struct PlanDetailView: View {
 
     // MARK: - Unsaved changes
 
+    /// A freshly-created plan with nothing added yet always counts as "changed" so the back
+    /// button confirms before silently leaving a phantom empty plan around — see
+    /// `isNewlyCreated`. Once a day is added the plan is clearly intentional, so this drops
+    /// away on its own (day changes already autosave immediately, same as elsewhere).
     private var hasChanges: Bool {
-        viewModel.plan.name != originalName || viewModel.plan.notes != originalNotes
+        if viewModel.plan.name != originalName || viewModel.plan.notes != originalNotes {
+            return true
+        }
+        return isNewlyCreated && viewModel.days.isEmpty
     }
 
     private func saveChanges() {
@@ -100,8 +117,13 @@ struct PlanDetailView: View {
     }
 
     private func discardChanges() {
-        viewModel.plan.name = originalName
-        viewModel.plan.notes = originalNotes
+        if isNewlyCreated && viewModel.days.isEmpty {
+            context.delete(viewModel.plan)
+            try? context.save()
+        } else {
+            viewModel.plan.name = originalName
+            viewModel.plan.notes = originalNotes
+        }
     }
 
     // MARK: - Sections

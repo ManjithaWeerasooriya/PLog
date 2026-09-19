@@ -14,6 +14,11 @@ import SwiftData
 /// leave its destination outside the path and break `NavigationLink(value:)` inside it).
 enum PlanRoute: Hashable {
     case log(WorkoutPlan)
+    /// A plan freshly created by "+", pushed straight into editing. Distinct from the plain
+    /// `WorkoutPlan.self` destination (used for normal row taps) so `PlanDetailView` knows to
+    /// offer discarding it if the user backs out before adding anything — see
+    /// `PlanDetailView.isNewlyCreated`.
+    case newPlan(WorkoutPlan)
 }
 
 struct PlanListView: View {
@@ -60,6 +65,8 @@ struct PlanListView: View {
                 switch route {
                 case .log(let plan):
                     PlanLogView(plan: plan, context: context, path: $path)
+                case .newPlan(let plan):
+                    PlanDetailView(plan: plan, context: context, isNewlyCreated: true)
                 }
             }
             // `.alert` rather than `.confirmationDialog`: the latter renders (at least on
@@ -147,7 +154,7 @@ struct PlanListView: View {
         let plan = WorkoutPlan(name: "New Plan")
         context.insert(plan)
         try? context.save()
-        path.append(plan)
+        path.append(PlanRoute.newPlan(plan))
     }
 
     /// Copies the plan's days and exercise slots into a new, inactive plan; stays on the
