@@ -3,7 +3,7 @@
 //  PLog
 //
 //  The Plans section of the Library tab: the currently active plan on top, every other plan
-//  below. Tap "+" to create a plan and jump straight into editing it. The owning
+//  below. Tap "+" to name a new plan and jump straight into editing it. The owning
 //  `NavigationStack` (and every `navigationDestination`) lives in `LibraryView`.
 //
 
@@ -15,11 +15,6 @@ import SwiftData
 /// leave its destination outside the path and break `NavigationLink(value:)` inside it).
 enum PlanRoute: Hashable {
     case log(WorkoutPlan)
-    /// A plan freshly created by "+", pushed straight into editing. Distinct from the plain
-    /// `WorkoutPlan.self` destination (used for normal row taps) so `PlanDetailView` knows to
-    /// offer discarding it if the user backs out before adding anything — see
-    /// `PlanDetailView.isNewlyCreated`.
-    case newPlan(WorkoutPlan)
 }
 
 struct PlanListView: View {
@@ -35,6 +30,7 @@ struct PlanListView: View {
     @State private var showingDeleteConfirmation = false
     /// Shown instead of the confirmation dialog when a swipe targets the active plan.
     @State private var showingActivePlanBlockedAlert = false
+    @State private var showingNewPlan = false
 
     var body: some View {
         Group {
@@ -47,10 +43,16 @@ struct PlanListView: View {
         .navigationTitle("Plans")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button(action: createPlan) {
+                Button {
+                    showingNewPlan = true
+                } label: {
                     Label("New Plan", systemImage: "plus")
                 }
             }
+        }
+        // Name first, insert on confirm: backing out of the sheet leaves nothing behind.
+        .sheet(isPresented: $showingNewPlan) {
+            NameEntrySheet(title: "New Plan", placeholder: "e.g. Push / Pull / Legs", onConfirm: createPlan)
         }
         // `.alert` rather than `.confirmationDialog`: the latter renders (at least on
         // this iOS version) as a small anchored callout that latches onto an arbitrary
@@ -120,7 +122,7 @@ struct PlanListView: View {
         } description: {
             Text("Build a plan of days like Push, Pull and Legs, then start it to log against it.")
         } actions: {
-            Button("Create a Plan", action: createPlan)
+            Button("Create a Plan") { showingNewPlan = true }
                 .buttonStyle(.borderedProminent)
         }
     }
@@ -132,11 +134,11 @@ struct PlanListView: View {
 
     // MARK: - Actions
 
-    private func createPlan() {
-        let plan = WorkoutPlan(name: "New Plan")
+    private func createPlan(named name: String) {
+        let plan = WorkoutPlan(name: name)
         context.insert(plan)
         try? context.save()
-        path.append(PlanRoute.newPlan(plan))
+        path.append(plan)
     }
 
     /// Copies the plan's days and exercise slots into a new, inactive plan; stays on the

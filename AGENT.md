@@ -42,15 +42,14 @@ PLog/                        ← repo root
     │   ├── UserProfile.swift        ← the user's own details; singleton (ensureExists(in:))
     │   └── Gender.swift              ← plain enum incl. .preferNotToSay, not Optional<Gender>
     ├── ViewModels/
-    │   ├── ExerciseEntryViewModel.swift   ← prefill, duplicate-set, per-set trend
+    │   ├── ExerciseEntryViewModel.swift   ← per-exercise set list: prefill, duplicate-set, per-set trend
     │   ├── ExerciseHistoryViewModel.swift ← metric picker, chart data, overall trend
     │   ├── ExerciseLibraryViewModel.swift ← search/filter/add/delete for master list
     │   └── WorkoutPlanViewModel.swift     ← start/end, day CRUD, logWorkout(for:) stamping
     ├── Views/
     │   ├── Components/
-    │   │   ├── NumberPickerWheel.swift    ← scrollable wheel picker for weight/reps/sets/age/etc.
-    │   │   ├── UnsavedChangesGuard.swift  ← .confirmBeforeLeaving(...) — see Architecture
-    │   │   ├── UnsavedTag.swift     ← "Unsaved" capsule pill — same style as PlanStatusPill
+    │   │   ├── NumberStepper.swift  ← ⊖ / number / ⊕ input for weight/reps/sets/age/etc. — see Code Conventions
+    │   │   ├── NameEntrySheet.swift ← "name it first" sheet used to create plans and plan days
     │   │   └── TrendBadge.swift     ← green/red/gray capsule pill; CategoryChip
     │   ├── Home/
     │   │   ├── HomeView.swift       ← Logs tab: sessions by month; "+" picks a plan day
@@ -62,12 +61,11 @@ PLog/                        ← repo root
     │   │   ├── AnalyticsCard.swift     ← card tile, title, BigStat, ProgressRing
     │   │   └── ActivityDotGrid.swift   ← 3-month "did I train?" dot grid
     │   ├── DayDetail/
-    │   │   ├── DayDetailView.swift       ← editable session header + exercise list
-    │   │   └── ExerciseEntryCard.swift   ← collapsible card per exercise
+    │   │   ├── DayDetailView.swift       ← editable session header + exercises with sets edited inline
+    │   │   ├── ExerciseEntryRows.swift   ← one exercise's rows: header, its SetRows, "Add Set", last-time hint
+    │   │   └── SetRow.swift              ← one set: summary row; steppers appear in place when expanded
     │   ├── Entry/
-    │   │   ├── AddEditExerciseEntryView.swift ← quick-entry sheet; drives which set is expanded
-    │   │   ├── SetEditorRow.swift             ← collapsible set row; wheel pickers when expanded
-    │   │   └── ExercisePickerView.swift       ← searchable sheet to pick from library
+    │   │   └── ExercisePickerView.swift  ← searchable sheet to pick from library
     │   ├── History/
     │   │   └── ExerciseHistoryView.swift ← Swift Charts line chart per exercise; Edit button
     │   ├── Plans/
@@ -75,7 +73,7 @@ PLog/                        ← repo root
     │   │   ├── WorkoutPlanRow.swift     ← plan row + PlanStatusPill
     │   │   ├── PlanDetailView.swift     ← name, Start/End button, day list, link to log
     │   │   ├── PlanDayDetailView.swift  ← day template: name + exercise slots
-    │   │   ├── PlanExerciseRow.swift    ← slot row with sets/reps wheel pickers
+    │   │   ├── PlanExerciseRow.swift    ← slot row with sets/reps steppers
     │   │   └── PlanLogView.swift        ← date-by-date log with Rest Day gaps, "Up Next"
     │   ├── Library/
     │   │   ├── LibraryView.swift         ← Library tab: Plans | Exercises sub-nav; owns the stack
@@ -153,7 +151,7 @@ Setting only the to-one side (`slot.planDay = day`, or passing it to the `init`)
 
 ### A set has no "completed" flag
 
-`SetEntry` was simplified to drop its old `completed: Bool` tick box. A set's existence in `ExerciseEntry.orderedSets` **is** its "added" state — there's no separate in-progress/done toggle to manage. Don't reintroduce one without a concrete reason; it previously added UI weight (a checkbox in `SetEditorRow`, a checkmark in `ExerciseEntryCard`) without affecting `ProgressiveOverload` or any query.
+`SetEntry` was simplified to drop its old `completed: Bool` tick box. A set's existence in `ExerciseEntry.orderedSets` **is** its "added" state — there's no separate in-progress/done toggle to manage. Don't reintroduce one without a concrete reason; it previously added UI weight (a checkbox on every set row and a checkmark on every exercise row) without affecting `ProgressiveOverload` or any query.
 
 ---
 
@@ -164,7 +162,7 @@ Setting only the to-one side (`slot.planDay = day`, or passing it to the `init`)
 `@Query` only works inside a `View` (`@Query` is a property wrapper tied to the SwiftUI environment). The split is:
 
 - **List/read screens** (`HomeView`, `ExerciseLibraryView`, `ExercisePickerView`): use `@Query` directly, keep filtering/grouping inline as computed properties.
-- **Mutation-heavy screens** (`AddEditExerciseEntryView`): use an `@Observable` view model (`ExerciseEntryViewModel`) that holds the `ModelContext` and owns all insert/delete logic.
+- **Mutation-heavy screens** (`ExerciseEntryRows`, `PlanDetailView`): use an `@Observable` view model (`ExerciseEntryViewModel`, `WorkoutPlanViewModel`) that holds the `ModelContext` and owns all insert/delete logic. `ExerciseEntryViewModel` is created per exercise on the session screen; it does **not** prefill in `init` — `ExerciseEntryViewModel.prefill(_:in:)` is called exactly once, by `DayDetailView.addExercise`, so an entry whose sets were all deleted stays empty instead of regrowing a set every time its rows are rebuilt.
 
 ### Passing ModelContext to view models
 
@@ -172,14 +170,12 @@ Setting only the to-one side (`slot.planDay = day`, or passing it to the `init`)
 
 ```swift
 // In the View:
-init(entry: ExerciseEntry, context: ModelContext) {
+init(entry: ExerciseEntry, context: ModelContext, …) {
     _viewModel = State(initialValue: ExerciseEntryViewModel(entry: entry, context: context))
 }
 
-// Called from the parent:
-.sheet(item: $editingEntry) { entry in
-    AddEditExerciseEntryView(entry: entry, context: context)
-}
+// Called from the parent (which reads @Environment(\.modelContext) in its body):
+ExerciseEntryRows(entry: entry, context: context, …)
 ```
 
 Do not deviate from this pattern. Do not try to capture `@Environment` in an `init` — it will crash.
@@ -188,7 +184,9 @@ Do not deviate from this pattern. Do not try to capture `@Environment` in an `in
 
 `HomeView` owns a `NavigationStack(path: $path)` with a typed `[WorkoutDay]` path. To push a newly created day immediately to its detail screen, call `path.append(day)` after inserting. Sheets are used for all editor flows (entry form, exercise picker, library actions).
 
-`LibraryView` (the Library tab) owns the single `NavigationStack` and `NavigationPath` that both of its sections share (mixed types: `WorkoutPlan`, `PlanDay`, `WorkoutDay`, `PlanRoute`, `Exercise`) and registers every `navigationDestination(for:)` at the stack root. `PlanListView` and `ExerciseLibraryView` are plain stack *content* — they set their own title/toolbar/`searchable` but must not wrap themselves in a `NavigationStack`. **Push everything by value** in this stack. A view-builder `NavigationLink { … }` leaves its destination outside the path and `NavigationLink(value:)` rows inside it silently do nothing (row highlights, no push) — that's why the log screen is reached via `PlanRoute.log(plan)` and why `ExerciseLibraryView` links to `ExerciseHistoryView` via `NavigationLink(value: exercise)`. Screens that need to push programmatically (`PlanListView` on "+", `PlanLogView` after logging) take `path: Binding<NavigationPath>`.
+`LibraryView` (the Library tab) owns the single `NavigationStack` and `NavigationPath` that both of its sections share (mixed types: `WorkoutPlan`, `PlanDay`, `WorkoutDay`, `PlanRoute`, `Exercise`) and registers every `navigationDestination(for:)` at the stack root. `PlanListView` and `ExerciseLibraryView` are plain stack *content* — they set their own title/toolbar/`searchable` but must not wrap themselves in a `NavigationStack`. **Push everything by value** in this stack. A view-builder `NavigationLink { … }` leaves its destination outside the path and `NavigationLink(value:)` rows inside it silently do nothing (row highlights, no push) — that's why the log screen is reached via `PlanRoute.log(plan)` and why `ExerciseLibraryView` links to `ExerciseHistoryView` via `NavigationLink(value: exercise)`. Screens that need to push programmatically (`PlanListView` after naming a new plan, `PlanLogView` after logging) take `path: Binding<NavigationPath>`.
+
+**New plans and plan days are named before they exist.** "+" on Plans and "Add Day" on a plan both present `NameEntrySheet` (`Views/Components/NameEntrySheet.swift` — the Reminders "New List" pattern: focused field, Cancel / Create disabled while blank). The record is inserted only on confirm, so backing out never leaves an unnamed placeholder behind and there is no phantom-record cleanup anywhere. Don't insert-then-push for a new record; name it first.
 
 The segmented Plans | Exercises picker is a `@State` in `LibraryView`, rendered as a `.principal` toolbar item with `.navigationBarTitleDisplayMode(.inline)` — i.e. it *replaces* the title in the nav bar. It was first tried as a view above the list, but Exercises' `.searchable` field lives in the nav bar, so the picker jumped down by a search bar's height on every switch; the nav bar is the only slot above the search field. The sections still set `.navigationTitle` so pushed screens get a proper back-button label. Switching sections is only possible at the stack root, so swapping the root view never orphans a pushed screen.
 
@@ -196,7 +194,7 @@ The segmented Plans | Exercises picker is a `@State` in `LibraryView`, rendered 
 
 ### Plans → sessions (the Logs tab)
 
-`WorkoutLogger.logWorkout(for:on:in:)` stamps a `PlanDay` template into a `WorkoutDay`: one `ExerciseEntry` per slot with `targetSets` sets at `targetReps`, weight prefilled from `WorkoutHistory.previousTopSet` — so logging a plan day means only adjusting weights. It's called from two places that must stay in sync: the **Logs tab** (`HomeView`'s "+" is a `Menu` of the active plan's days, with `WorkoutLogger.suggestedNextDay` flagged "Up next", plus "Blank Workout"; it's a plain button when no plan is active) and the plan's own log screen via `WorkoutPlanViewModel`. `DayDetailView` shows a "Plan Day" row for stamped sessions and passes `initiallyExpanded: true` to their cards.
+`WorkoutLogger.logWorkout(for:on:in:)` stamps a `PlanDay` template into a `WorkoutDay`: one `ExerciseEntry` per slot with `targetSets` sets at `targetReps`, weight prefilled from `WorkoutHistory.previousTopSet` — so logging a plan day means only adjusting weights. It's called from two places that must stay in sync: the **Logs tab** (`HomeView`'s "+" is a `Menu` of the active plan's days, with `WorkoutLogger.suggestedNextDay` flagged "Up next", plus "Blank Workout"; it's a plain button when no plan is active) and the plan's own log screen via `WorkoutPlanViewModel`. `DayDetailView` shows a "Plan Day" row for stamped sessions.
 
 `PlanTimeline.items(for:workouts:)` produces the plan log rows: every calendar day from `startedAt` to `endedAt ?? today`; days with no session are rest days (today is shown as "Not logged yet" instead).
 
@@ -224,17 +222,16 @@ Both tabs follow the list/read-screen pattern: `@Query` in the view, all math in
 
 `PLogApp` calls `StarterData.seedIfNeeded(in:)` right after building the container. It seeds only when there are **zero** `Exercise` rows: a 20-exercise library across all muscle groups, an active "Push / Pull / Legs" plan (3 days, 5 slots each) and a not-started "Upper / Lower" plan. It never touches a store that already has data. This is distinct from `SampleData`, which is the in-memory preview fixture and also seeds workout history.
 
-### Unsaved-changes confirmation on every live-editing screen
+### Save model: pushed screens autosave, sheets are Cancel/Done
 
-Every screen that live-binds `@Model` properties (so edits apply the instant the user types/scrolls, with no separate "save" step) confirms before letting the user navigate away with unsaved edits, and shows an `UnsavedTag` (`Views/Components/UnsavedTag.swift` — a capsule pill, same visual language as `PlanStatusPill`/`CategoryChip`/`TrendBadge`) next to the title while dirty. It sits in a custom `.principal` toolbar item beside the title text, not appended into the title string itself — `.navigationTitle` only takes a plain `String`, so it can't carry a colored/shaped tag. This covers `PlanDayDetailView` (day name + each slot's target sets/reps), `DayDetailView` (session name/date/notes), `PlanDetailView` (plan name/notes), `AddEditExerciseEntryView` (set weights/reps, plus adding/removing sets), and `AddExerciseView` (name/category/notes). **Do not add a new live-binding editor without this** — it's the whole point of the fix described below.
+Two lanes, matching how Apple's own apps behave — pick one per screen, never mix them:
 
-**Pushed screens** (`PlanDayDetailView`, `DayDetailView`, `PlanDetailView`) use the shared `.confirmBeforeLeaving(title:hasChanges:onSave:onDiscard:)` modifier (`Views/Components/UnsavedChangesGuard.swift`). It hides the system back button and replaces it with one that pops immediately when `hasChanges` is false, or shows an alert (Save / Discard Changes / Cancel) when true; it also renders the `.principal` title + `UnsavedTag` itself, so callers just pass `title:` as a plain string. Each screen supplies its own `hasChanges` (compare current model values to a baseline captured in `init`, **not** `.onAppear` — see the `AddExerciseView` note above for why that specifically breaks) and `onDiscard` (reassign the tracked scalar properties back to the baseline). **Trade-off**: hiding the back button also disables the edge-swipe-back gesture on these screens — an accepted cost of forcing the confirmation path; don't try to "fix" this by un-hiding the button, that defeats the guard.
+- **Pushed detail screens** (`DayDetailView`, `PlanDetailView`, `PlanDayDetailView`) live-bind `@Model` properties and **autosave** (the Notes/Reminders model). They use the system back button and title; the edge-swipe-back gesture always works; nothing is confirmed on the way out. Structural changes (add/remove a set, exercise, day) call `try? context.save()` immediately, as everywhere else.
+- **Sheets that draft locally** (`AddExerciseView`, `NameEntrySheet`) keep Cancel / Save (or Create) and `.interactiveDismissDisabled(hasChanges)` with a "Discard Changes?" `.alert` — the modal-editor model. The model is never touched until Save.
 
-**The Sets editor sheet** (`AddEditExerciseEntryView`) can't use the scalar-revert approach because sets can be *added and removed*, not just edited — reverting means restoring the whole list. `ExerciseEntryViewModel.currentSnapshot`/`revert(to:)` capture/restore the full set list by **deleting everything and recreating fresh `SetEntry` objects from the snapshot**, rather than diffing/matching old vs. new — this is what makes it correct regardless of which combination of edit/add/remove/reorder happened. The sheet adds an explicit "Cancel" (previously it only had "Done") that confirms via the same Save/Discard Changes/Cancel alert when dirty, plus `.interactiveDismissDisabled(hasChanges)` so swiping the sheet away can't bypass the prompt.
+**Don't reintroduce a back-button guard.** An earlier version replaced the system back button on the pushed screens with a custom one that asked Save / Discard / Cancel and showed an orange "Unsaved" tag in the title. That bolted a modal save model onto detail screens: it hid the platform back button, killed swipe-back, and (on iOS 26) opted those screens out of the system's glass back button entirely — while the sheets already had a proper Cancel/Done. If a screen genuinely needs a safety net for accidental edits, the platform answer is `UndoManager` (`context.undoManager`, shake-to-undo), not a confirmation on back.
 
-**`AddExerciseView`** already used a local-draft pattern (see the `.onAppear`-vs-`init` note above) where Cancel silently discarded correctly — it just didn't *ask* first. Added the same confirm-before-discard alert for consistency; no revert logic needed there since the model was never touched until Save.
-
-**Deliberately excluded**: `SettingsView` (a root tab, not a pushed/sheeted editor — there's no "back" gesture to guard, and live-applying preferences instantly matches how Settings apps conventionally behave) and the explicit destructive buttons ("Remove Exercise from Day", swipe-to-delete elsewhere) — those are already unambiguous, already-confirmed (or single-purpose) actions, not the "silently saved by navigating away" failure mode this fix targets.
+`SettingsView` is a root tab and live-applies preferences, as Settings apps conventionally do.
 
 ### Data export / import is a JSON snapshot, not the SwiftData store
 
@@ -315,21 +312,27 @@ When adding a new screen, always wire up a `#Preview` using `SampleData.containe
 
 Always use `WeightFormatter.string(_:)` to display weights — drops `.0` for whole numbers (`60` not `60.0`), keeps one decimal for halves (`62.5`). Do not use `String(format:)` or `.formatted()` on weight values directly.
 
-### NumberPickerWheel
+### NumberStepper
 
-All weight/reps/sets/age/height/weight entry uses `NumberPickerWheel` (`Views/Components/NumberPickerWheel.swift`) — a scrollable `.pickerStyle(.wheel)` with a `.sensoryFeedback(.selection, trigger: value)` tick on every row change — not steppers or free text. It has a `Double` `init` (title, value, step, range, unit, width, height, format) and an `intValue:` convenience init mirroring it. **Argument order matters**: Swift requires call-site arguments in declaration order even for a mix of positional/labeled params here, so `format:` must come after `width:`/`height:`, not before. The wheel's row values are generated **by index** (`lowerBound + Double(i) * step`), not by repeated addition, so a fractional `step` (e.g. `2.5` for weight) never drifts out of exact alignment with the bound value — a `Picker` selection silently fails to highlight anything if the bound value doesn't exactly match one of the row tags. Any value bound into this component must land exactly on the step grid; `WorkoutLogger`/`ProgressiveOverload` always produce grid-aligned weights because they only ever copy numbers that came from this same picker.
+All weight/reps/sets/age/height/weight entry uses `NumberStepper` (`Views/Components/NumberStepper.swift`) — a ⊖ / number / ⊕ control, not free text and not a wheel. It has a `Double` `init` (`title, value, step, range, unit, style, format, keyboard`) and an `intValue:` convenience init mirroring it. Two layouts via `style:`: `.hero` (default — caption title above, large rounded number between the buttons; used in `SetRow` and `PlanExerciseRow`, two side by side in an `HStack(spacing: 24)`) and `.row` (a single form row, title leading and the compact control trailing; used in `SettingsView`).
 
-For an `Int?`/`Double?` model field (`UserProfile.age`/`heightCm`/`weightKg`), bind through a computed `Binding` with a fallback default (e.g. `profile.age ?? 25`) and seed the real default into the model `onAppear` — see `SettingsView` — so the wheel's initial display never silently disagrees with the (still-`nil`) persisted value.
+Behavior worth knowing before touching it:
 
-Two wheels side by side in one row (`SetEditorRow`, `PlanExerciseRow`) fit comfortably at their default sizing; this replaced the old `ValueStepper` (+/- buttons), which needed hand-tuned compact sizing to avoid clipping at this width and has been deleted.
+- **Tap steps once; hold repeats.** `RepeatButton` (private, same file) reads `isPressed` from its `ButtonStyle` — set on touch-down, and reliably cleared if the enclosing List's scroll cancels the touch — and runs a `Task` that waits 400 ms, then steps every 80 ms, dropping to 40 ms after ~1 s (`RepeatTiming`). The `Button`'s own action only fires when the hold loop never ran, so a release after a hold doesn't add one extra step. This was first written on a `DragGesture(minimumDistance: 0)`, which can be cancelled by the scroll view without `onEnded` ever firing and would leave the loop running forever — hence the `ButtonStyle`.
+- **Haptics on every step**, including during a hold: `.sensoryFeedback(.increase/.decrease, trigger: value)` with a direction predicate.
+- **Tap the number to type an exact value.** It swaps to an inline `TextField` (`.decimalPad`, or `.numberPad` for the int init), seeded once from the value (see the `AddExerciseView` "seed from init" note for why it's not re-derived per keystroke — reformatting mid-entry drops a just-typed "."), parsed with `,` → `.`, clamped to `range`, and committed when focus ends (keyboard "Done" / return).
+- **Values don't need to sit on a step grid.** The old wheel `Picker` silently failed to highlight anything unless the bound value exactly matched a row tag, so every producer had to emit grid-aligned numbers. A stepper just adds `step` to whatever's there (`61 → 63.5`), so typed values and imported data are fine as-is.
+- Row buttons that host steppers (`SetRow`, `PlanExerciseRow`, `ExerciseEntryRows`' header) are `Button`s with `.tint(.primary)`: on iOS 26 the default button style tints its label with the accent, and hierarchical `.primary`/`.secondary` inside then resolve against *that* — so without the tint override the whole row went blue.
+
+For an `Int?`/`Double?` model field (`UserProfile.age`/`heightCm`/`weightKg`), bind through a computed `Binding` with a fallback default (e.g. `profile.age ?? 25`) and seed the real default into the model `onAppear` — see `SettingsView` — so the stepper's initial display never silently disagrees with the (still-`nil`) persisted value.
 
 ### Sets, logged exercises, and plan-day slots are all collapsible, accordion-style — same pattern, same look
 
-`SetEditorRow` (inside `AddEditExerciseEntryView`), `ExerciseEntryCard` (inside `DayDetailView`), and `PlanExerciseRow` (inside `PlanDayDetailView`) all take `isExpanded: Binding<Bool>` rather than owning their own `@State`. Each parent holds a single `expanded…ID: PersistentIdentifier?` and hands every row a computed `Binding` that compares against it, so **only one row is ever expanded at a time** in any of the three lists — these are three independent instances of the same pattern (one per list, not a single shared ID), so expanding a set doesn't affect which exercise or slot is expanded elsewhere. Both start with everything collapsed (`AddEditExerciseEntryView` is the one exception — it seeds `expandedSetID` to the first set's ID in `init` so opening the sheet needs no extra tap to adjust the set you almost certainly care about, and re-points it whenever "Duplicate Last Set" runs; `DayDetailView`'s `expandedEntryID` starts `nil` unconditionally, including for plan-logged sessions that used to auto-expand every card — don't reintroduce that).
+Sets are edited **inline on the session screen** — there is no separate set-editor sheet. `DayDetailView` renders one `ExerciseEntryRows` per `ExerciseEntry` inside a single `Section("Exercises")`; each produces a header row and, while expanded, one `SetRow` per set (a nested `ForEach` with `.onDelete`, so swipe-to-delete works per set), an "Add Set" row (duplicates the last set and expands it) and a "Last time" footnote. Tapping a `SetRow` reveals the two `NumberStepper`s in the same row. Exercise delete and History live on the header row's `.swipeActions`/`.contextMenu`; History is presented as a **sheet** (`historyExercise`) because `DayDetailView` is reachable from three different stacks and owns no `path` to push onto. Adding an exercise (`+` → `ExercisePickerView`) inserts the entry, prefills set 1, expands both the entry and that set, and scrolls the header into view (`ScrollViewReader` + `.id(entry.persistentModelID)`) — one modal, no second sheet.
 
-Visually, both lists are **plain rows inside one shared `Section`** — a header (name/summary + trailing chevron that rotates on expand) that reveals more content below when tapped, no per-row card background or hidden separators. `ExerciseEntryCard` used to render each exercise as its own floating rounded-rect card (`.background(...,  in: RoundedRectangle(...))`, `.listRowSeparator(.hidden)`); that's gone specifically so the exercises list in `DayDetailView` matches the sets list's look. Keep any new expandable list in this style — a shared `Section`, `Binding`-driven per-row expansion, no individual card chrome — rather than reinventing a bespoke card look.
+`SetRow` (inside `ExerciseEntryRows`), `ExerciseEntryRows` (inside `DayDetailView`), and `PlanExerciseRow` (inside `PlanDayDetailView`) all take `isExpanded: Binding<Bool>` rather than owning their own `@State`. Each parent holds a single `expanded…ID: PersistentIdentifier?` and hands every row a computed `Binding` that compares against it, so **only one row is ever expanded at a time** in any list. `DayDetailView` holds two such IDs — `expandedEntryID` (which exercise) and `expandedSetID` (which set, across the whole day) — and collapsing an exercise clears the set too. Everything starts collapsed except a just-added exercise's first set.
 
----
+Visually, all of these are **plain rows inside one shared `Section`** — a header (name/summary + trailing chevron that rotates on expand) that reveals more content below when tapped, no per-row card background or hidden separators. Headers are `Button`s (not `onTapGesture`) so they highlight on touch-down and carry the button trait for VoiceOver; see the `.tint(.primary)` note under NumberStepper. Keep any new expandable list in this style rather than reinventing a bespoke card look.
 
 ## Git
 
@@ -344,6 +347,6 @@ Visually, both lists are **plain rows inside one shared `Section`** — a header
 
 - **Signing:** development team not configured — set in Xcode → Target → Signing & Capabilities before building to a device or submitting to TestFlight.
 - **Deployment target:** currently `26.5` in the project-level build settings; the target-level override sets `17.0`. Unify to `17.0` in project-level settings when convenient.
-- **Weight unit preference:** the app hardcodes `kg`; `UserProfile` also stores height in cm and weight in kg with no unit toggle. A kg/lbs (and cm/in) preference would need a `UserDefaults`-backed `@AppStorage` and threading it through `WeightFormatter`, `NumberPickerWheel` ranges, and all display sites.
+- **Weight unit preference:** the app hardcodes `kg`; `UserProfile` also stores height in cm and weight in kg with no unit toggle. A kg/lbs (and cm/in) preference would need a `UserDefaults`-backed `@AppStorage` and threading it through `WeightFormatter`, `NumberStepper` ranges, and all display sites.
 - **`ExerciseLibraryViewModel`** is wired for mutations (add/delete) but the library and picker views inline their own `@Query`-based filtering. Consolidate if the filter logic grows complex.
 - **`BuildProject` may target a physical device instead of the simulator** depending on Xcode's currently-selected scheme destination, with no MCP tool to switch it. If a simulator install/launch doesn't reflect a change you just built, check `PLog.app/PLog.debug.dylib`'s mtime in DerivedData's `Debug-iphonesimulator` products dir before assuming the app is broken — it may just be stale. Fall back to `xcodebuild -project PLog.xcodeproj -scheme PLog -configuration Debug -destination "platform=iOS Simulator,id=<UDID>" -derivedDataPath <tmp> build` to force a simulator build.

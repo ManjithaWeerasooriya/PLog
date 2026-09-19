@@ -57,8 +57,6 @@ struct LibraryView: View {
                 switch route {
                 case .log(let plan):
                     PlanLogView(plan: plan, context: context, path: $path)
-                case .newPlan(let plan):
-                    PlanDetailView(plan: plan, context: context, isNewlyCreated: true)
                 }
             }
             .navigationDestination(for: Exercise.self) { exercise in

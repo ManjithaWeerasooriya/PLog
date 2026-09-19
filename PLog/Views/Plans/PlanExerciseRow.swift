@@ -3,43 +3,39 @@
 //  PLog
 //
 //  One exercise slot in a day template. Collapsed it shows a "3 × 8" summary; tap it to
-//  reveal wheel pickers for target sets × reps. Styled and behaved the same as
-//  `SetEditorRow`/`ExerciseEntryCard` — a plain row, expansion controlled by the parent so
-//  only one slot is open at a time.
+//  reveal steppers for target sets × reps. Styled and behaved the same as `SetRow` — a
+//  plain row, expansion controlled by the parent so only one slot is open at a time.
 //
 
 import SwiftUI
 import SwiftData
 
 struct PlanExerciseRow: View {
-    /// `@Bindable` gives the wheels two-way bindings straight into the model.
+    /// `@Bindable` gives the steppers two-way bindings straight into the model.
     @Bindable var planExercise: PlanExercise
     /// Controlled by the parent so only one slot is expanded at a time (accordion-style) —
     /// see `PlanDayDetailView`.
     @Binding var isExpanded: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            header
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    withAnimation(.snappy) { isExpanded.toggle() }
-                }
+        VStack(alignment: .leading, spacing: 12) {
+            Button {
+                withAnimation(.snappy) { isExpanded.toggle() }
+            } label: {
+                header
+            }
+            // Keeps the List row highlight, but text resolves against the label color rather
+            // than the accent tint the default button style applies to its label.
+            .tint(.primary)
+            .accessibilityAddTraits(isExpanded ? [.isSelected] : [])
+            .accessibilityHint("Double-tap to edit target sets and reps")
 
             if isExpanded {
-                HStack(spacing: 20) {
-                    NumberPickerWheel(
-                        title: "Sets",
-                        intValue: $planExercise.targetSets,
-                        range: 1...20
-                    )
-                    NumberPickerWheel(
-                        title: "Reps",
-                        intValue: $planExercise.targetReps,
-                        range: 1...100
-                    )
+                HStack(alignment: .top, spacing: 24) {
+                    NumberStepper(title: "Sets", intValue: $planExercise.targetSets, range: 1...20)
+                    NumberStepper(title: "Reps", intValue: $planExercise.targetReps, range: 1...100)
                 }
-                .frame(maxWidth: .infinity)
+                .padding(.bottom, 4)
             }
         }
         .padding(.vertical, 4)
@@ -50,6 +46,7 @@ struct PlanExerciseRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(planExercise.exercise?.name ?? "Exercise")
                     .font(.headline)
+                    .foregroundStyle(.primary)
                 if let category = planExercise.exercise?.category {
                     CategoryChip(category: category)
                 }
@@ -58,11 +55,13 @@ struct PlanExerciseRow: View {
             Text("\(planExercise.targetSets) × \(planExercise.targetReps)")
                 .font(.subheadline.monospacedDigit())
                 .foregroundStyle(.secondary)
+                .contentTransition(.numericText())
             Image(systemName: "chevron.right")
                 .font(.caption.weight(.bold))
                 .foregroundStyle(.tertiary)
                 .rotationEffect(.degrees(isExpanded ? 90 : 0))
         }
+        .contentShape(Rectangle())
     }
 }
 
@@ -70,7 +69,7 @@ struct PlanExerciseRow: View {
     struct Demo: View {
         @State private var isExpanded = true
         var body: some View {
-            Form {
+            List {
                 PlanExerciseRow(
                     planExercise: SampleData.pushDay.orderedExercises.first!,
                     isExpanded: $isExpanded

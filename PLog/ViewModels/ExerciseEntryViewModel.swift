@@ -2,30 +2,21 @@
 //  ExerciseEntryViewModel.swift
 //  PLog
 //
-//  Drives the quick-entry screen: prefilling from the last session, adding/duplicating
-//  sets, and classifying each set against the previous session for progressive overload.
+//  Drives one exercise's inline set list on the session screen: adding/duplicating sets,
+//  removing them, and classifying each set against the previous session for progressive
+//  overload. Edits to individual sets bind straight into the `SetEntry` models (autosave).
 //
 
 import Foundation
 import SwiftData
 
-/// A full-fidelity copy of one set's fields, used only to snapshot/restore a set list —
-/// distinct from `SetSnapshot` (weight+reps only, used for progressive-overload math).
-struct SetFieldSnapshot: Equatable {
-    let setNumber: Int
-    let weight: Double
-    let reps: Int
-    let rpe: Double?
-    let notes: String?
-}
-
 @MainActor
 @Observable
 final class ExerciseEntryViewModel {
-    /// The entry being edited. Its `SetEntry` objects are edited in place and bound to steppers.
+    /// The entry being edited. Its `SetEntry` objects are edited in place by the steppers.
     let entry: ExerciseEntry
 
-    /// The top set from the previous session — used for prefill and the "Last time" hint.
+    /// The top set from the previous session — used for the "Last time" hint and trends.
     let previousTopSet: SetSnapshot?
 
     private let context: ModelContext
@@ -36,7 +27,6 @@ final class ExerciseEntryViewModel {
         self.previousTopSet = entry.exercise.flatMap {
             WorkoutHistory.previousTopSet(for: $0, excluding: entry)
         }
-        prefillIfNeeded()
     }
 
     /// Sets sorted for display.
@@ -51,33 +41,43 @@ final class ExerciseEntryViewModel {
 
     // MARK: - Mutations
 
-    /// If the entry is brand new, seed it with one set prefilled from last time (or sensible
-    /// defaults) so the user can immediately tweak the numbers up.
-    private func prefillIfNeeded() {
+    /// Seeds a brand-new entry with one set prefilled from last time (or sensible defaults)
+    /// so the user can immediately nudge the numbers up. Called once, when the exercise is
+    /// added to the day — not on every view model creation, so an entry whose sets were all
+    /// deleted stays empty rather than silently regrowing a set.
+    static func prefill(_ entry: ExerciseEntry, in context: ModelContext) {
         guard entry.sets.isEmpty else { return }
-        let seed = previousTopSet ?? SetSnapshot(weight: 20, reps: 10)
-        let first = SetEntry(setNumber: 1, weight: seed.weight, reps: seed.reps, entry: entry)
+        let previous = entry.exercise.flatMap { WorkoutHistory.previousTopSet(for: $0, excluding: entry) }
+        let seed = previous ?? SetSnapshot(weight: 20, reps: 10)
+        let first = SetEntry(setNumber: 1, weight: seed.weight, reps: seed.reps)
         context.insert(first)
+        entry.sets.append(first)
     }
 
-    /// Adds a set, duplicating the last set's numbers (the common "another set, same load" flow).
-    func addDuplicateSet() {
+    /// Adds a set, duplicating the last set's numbers (the common "another set, same load"
+    /// flow). Returns it so the caller can expand it.
+    @discardableResult
+    func addDuplicateSet() -> SetEntry {
         let template = sets.last
         let next = SetEntry(
-            setNumber: (sets.last?.setNumber ?? 0) + 1,
+            setNumber: (template?.setNumber ?? 0) + 1,
             weight: template?.weight ?? previousTopSet?.weight ?? 20,
-            reps: template?.reps ?? previousTopSet?.reps ?? 10,
-            entry: entry
+            reps: template?.reps ?? previousTopSet?.reps ?? 10
         )
         context.insert(next)
+        entry.sets.append(next)
+        try? context.save()
+        return next
     }
 
     /// Removes a set and renumbers the remainder so `setNumber` stays 1-based and contiguous.
     func removeSet(_ set: SetEntry) {
+        entry.sets.removeAll { $0 === set }
         context.delete(set)
-        for (index, remaining) in entry.orderedSets.filter({ $0 !== set }).enumerated() {
+        for (index, remaining) in entry.orderedSets.enumerated() {
             remaining.setNumber = index + 1
         }
+        try? context.save()
     }
 
     /// Progressive-overload classification for a given set versus last session's top set.
@@ -86,49 +86,5 @@ final class ExerciseEntryViewModel {
             current: SetSnapshot(weight: set.weight, reps: set.reps),
             previous: previousTopSet
         )
-    }
-
-    /// Persist changes. SwiftData autosaves, but saving explicitly keeps previews/tests deterministic.
-    func save() {
-        try? context.save()
-    }
-
-    /// Discards the whole entry (used when the user cancels a freshly created entry).
-    func discard() {
-        context.delete(entry)
-        try? context.save()
-    }
-
-    // MARK: - Unsaved-changes snapshot
-
-    /// The set list's current fields, for comparing against a baseline captured when the
-    /// editor opened (see `AddEditExerciseEntryView`).
-    var currentSnapshot: [SetFieldSnapshot] {
-        sets.map {
-            SetFieldSnapshot(setNumber: $0.setNumber, weight: $0.weight, reps: $0.reps, rpe: $0.rpe, notes: $0.notes)
-        }
-    }
-
-    /// Restores the set list to exactly the given snapshot by deleting every current set and
-    /// recreating fresh `SetEntry` objects from it. A full delete-and-recreate (rather than
-    /// diffing/matching) is what makes this correct regardless of which combination of
-    /// edit/add/remove/reorder happened since the snapshot was taken.
-    func revert(to snapshot: [SetFieldSnapshot]) {
-        for set in entry.sets {
-            context.delete(set)
-        }
-        entry.sets.removeAll()
-        for saved in snapshot {
-            let restored = SetEntry(
-                setNumber: saved.setNumber,
-                weight: saved.weight,
-                reps: saved.reps,
-                rpe: saved.rpe,
-                notes: saved.notes,
-                entry: entry
-            )
-            context.insert(restored)
-            entry.sets.append(restored)
-        }
     }
 }

@@ -82,12 +82,6 @@ struct AddExerciseView: View {
                         }
                     }
                 }
-                ToolbarItem(placement: .principal) {
-                    HStack(spacing: 6) {
-                        Text(baseTitle).font(.headline)
-                        if hasChanges { UnsavedTag() }
-                    }
-                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save", action: save)
                         .disabled(trimmedName.isEmpty)

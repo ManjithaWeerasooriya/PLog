@@ -70,34 +70,18 @@ private struct SettingsForm: View {
             }
 
             Section("Body") {
-                HStack(spacing: 12) {
-                    NumberPickerWheel(
-                        title: "Age",
-                        intValue: ageBinding,
-                        range: 10...100,
-                        unit: "yrs",
-                        width: 84
-                    )
-                    NumberPickerWheel(
-                        title: "Height",
-                        value: heightBinding,
-                        step: 1,
-                        range: 100...250,
-                        unit: "cm",
-                        width: 100,
-                        format: { String(Int($0)) }
-                    )
-                    NumberPickerWheel(
-                        title: "Weight",
-                        value: weightBinding,
-                        step: 0.5,
-                        range: 30...300,
-                        unit: "kg",
-                        width: 100
-                    )
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 4)
+                NumberStepper(title: "Age", intValue: ageBinding, range: 10...100, unit: "yrs", style: .row)
+                NumberStepper(
+                    title: "Height",
+                    value: heightBinding,
+                    step: 1,
+                    range: 100...250,
+                    unit: "cm",
+                    style: .row,
+                    format: { String(Int($0)) },
+                    keyboard: .numberPad
+                )
+                NumberStepper(title: "Weight", value: weightBinding, step: 0.5, range: 30...300, unit: "kg", style: .row)
             }
 
             DataTransferSection()
@@ -105,9 +89,9 @@ private struct SettingsForm: View {
         .onAppear(perform: seedDefaultsIfNeeded)
     }
 
-    // MARK: - Optional <-> wheel bindings
+    // MARK: - Optional <-> stepper bindings
 
-    /// Seeds sensible starting values the first time Settings is opened, so the wheels never
+    /// Seeds sensible starting values the first time Settings is opened, so the steppers never
     /// silently disagree with the (still-nil) model — see `UserProfile.age`'s doc comment.
     private func seedDefaultsIfNeeded() {
         if profile.age == nil { profile.age = 25 }

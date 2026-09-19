@@ -3,8 +3,8 @@
 //  PLog
 //
 //  Shows one workout day: editable name/notes plus the exercises logged, each collapsible
-//  (accordion-style, one open at a time). Add exercises from the master library and jump
-//  into quick entry.
+//  (accordion-style, one open at a time) with its sets edited inline. Everything autosaves
+//  — there's no separate editor to open and nothing to confirm on the way out.
 //
 
 import SwiftUI
@@ -17,30 +17,28 @@ struct DayDetailView: View {
     @Bindable var day: WorkoutDay
 
     @State private var showingExercisePicker = false
-    /// The entry currently open in the quick-entry editor (drives the sheet).
-    @State private var editingEntry: ExerciseEntry?
-    /// The one exercise currently expanded (accordion-style — see `ExerciseEntryCard`).
-    /// Starts `nil` so every exercise opens collapsed, matching the set list's behavior.
+    /// The one exercise currently expanded (accordion-style — see `ExerciseEntryRows`).
     @State private var expandedEntryID: PersistentIdentifier?
-
-    /// Baseline the session's name/date/notes are compared against to decide whether the
-    /// back button should confirm before leaving.
-    @State private var originalName: String
-    @State private var originalDate: Date
-    @State private var originalNotes: String
-
-    init(day: WorkoutDay) {
-        _day = Bindable(wrappedValue: day)
-        _originalName = State(initialValue: day.name)
-        _originalDate = State(initialValue: day.date)
-        _originalNotes = State(initialValue: day.notes)
-    }
+    /// The one set currently open for editing, across the whole day — see `SetRow`.
+    @State private var expandedSetID: PersistentIdentifier?
+    /// The exercise whose history sheet is showing.
+    @State private var historyExercise: Exercise?
+    /// A just-added exercise to scroll into view once its rows exist.
+    @State private var scrollTarget: PersistentIdentifier?
 
     var body: some View {
-        List {
-            detailsSection
-            exercisesSection
+        ScrollViewReader { proxy in
+            List {
+                detailsSection
+                exercisesSection
+            }
+            .onChange(of: scrollTarget) { _, target in
+                guard let target else { return }
+                withAnimation(.snappy) { proxy.scrollTo(target, anchor: .top) }
+                scrollTarget = nil
+            }
         }
+        .navigationTitle(day.date.mediumDayLabel)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -54,31 +52,18 @@ struct DayDetailView: View {
         .sheet(isPresented: $showingExercisePicker) {
             ExercisePickerView(onSelect: addExercise)
         }
-        .sheet(item: $editingEntry) { entry in
-            AddEditExerciseEntryView(entry: entry, context: context)
+        // A sheet rather than a push: this screen lives in three different stacks (Logs,
+        // Calendar, Library) and has no path of its own to push onto.
+        .sheet(item: $historyExercise) { exercise in
+            NavigationStack {
+                ExerciseHistoryView(exercise: exercise)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Done") { historyExercise = nil }
+                        }
+                    }
+            }
         }
-        .confirmBeforeLeaving(
-            title: day.date.mediumDayLabel,
-            hasChanges: hasChanges,
-            onSave: saveChanges,
-            onDiscard: discardChanges
-        )
-    }
-
-    // MARK: - Unsaved changes
-
-    private var hasChanges: Bool {
-        day.name != originalName || day.date != originalDate || day.notes != originalNotes
-    }
-
-    private func saveChanges() {
-        try? context.save()
-    }
-
-    private func discardChanges() {
-        day.name = originalName
-        day.date = originalDate
-        day.notes = originalNotes
     }
 
     // MARK: - Sections
@@ -112,11 +97,15 @@ struct DayDetailView: View {
         } else {
             Section("Exercises") {
                 ForEach(day.orderedEntries) { entry in
-                    ExerciseEntryCard(entry: entry, isExpanded: isExpanded(entry)) {
-                        editingEntry = entry
-                    }
+                    ExerciseEntryRows(
+                        entry: entry,
+                        context: context,
+                        isExpanded: isExpanded(entry),
+                        expandedSetID: $expandedSetID,
+                        onHistory: { historyExercise = $0 },
+                        onDelete: { delete(entry) }
+                    )
                 }
-                .onDelete(perform: deleteEntries)
             }
         }
     }
@@ -124,7 +113,11 @@ struct DayDetailView: View {
     private func isExpanded(_ entry: ExerciseEntry) -> Binding<Bool> {
         Binding(
             get: { expandedEntryID == entry.persistentModelID },
-            set: { expanded in expandedEntryID = expanded ? entry.persistentModelID : nil }
+            set: { expanded in
+                expandedEntryID = expanded ? entry.persistentModelID : nil
+                // Collapsing an exercise also closes whichever of its sets was open.
+                if !expanded { expandedSetID = nil }
+            }
         )
     }
 
@@ -137,18 +130,29 @@ struct DayDetailView: View {
 
     // MARK: - Actions
 
-    /// Creates a new entry for the chosen exercise and immediately opens the quick editor.
+    /// Creates a new entry for the chosen exercise with its first set prefilled from last
+    /// time, then opens it in place — no second sheet.
     private func addExercise(_ exercise: Exercise) {
-        let entry = ExerciseEntry(exercise: exercise, workoutDay: day, order: day.entries.count)
+        let entry = ExerciseEntry(exercise: exercise, order: day.entries.count)
         context.insert(entry)
+        day.entries.append(entry)
+        ExerciseEntryViewModel.prefill(entry, in: context)
         try? context.save()
-        editingEntry = entry
+        withAnimation(.snappy) {
+            expandedEntryID = entry.persistentModelID
+            expandedSetID = entry.orderedSets.first?.persistentModelID
+        }
+        scrollTarget = entry.persistentModelID
     }
 
-    private func deleteEntries(at offsets: IndexSet) {
-        let ordered = day.orderedEntries
-        for index in offsets {
-            context.delete(ordered[index])
+    private func delete(_ entry: ExerciseEntry) {
+        withAnimation(.snappy) {
+            if expandedEntryID == entry.persistentModelID {
+                expandedEntryID = nil
+                expandedSetID = nil
+            }
+            day.entries.removeAll { $0 === entry }
+            context.delete(entry)
         }
         try? context.save()
     }
