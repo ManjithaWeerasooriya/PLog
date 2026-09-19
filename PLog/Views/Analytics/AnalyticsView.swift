@@ -140,7 +140,7 @@ struct AnalyticsView: View {
                     }
                     .frame(width: ringSize, height: ringSize)
                     Spacer(minLength: 0)
-                    AnalyticsCardTitle(title: "No active plan", subtitle: "Start one in Library")
+                    AnalyticsCardTitle(title: "No active plan", subtitle: "Start one in Plans")
                 }
             }
             .frame(maxHeight: .infinity, alignment: .top)

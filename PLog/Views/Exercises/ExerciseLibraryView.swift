@@ -2,9 +2,9 @@
 //  ExerciseLibraryView.swift
 //  PLog
 //
-//  The Exercises section of the Library tab: the master list, searchable, grouped by muscle
-//  group, with add/edit/delete. Tapping an exercise opens its progress history. The owning
-//  `NavigationStack` (and the `Exercise` destination) lives in `LibraryView`.
+//  The Exercises tab: the master list, searchable, grouped by muscle group, with
+//  add/edit/delete. Tapping an exercise opens its progress history. Owns the tab's
+//  `NavigationStack`.
 //
 
 import SwiftUI
@@ -27,6 +27,15 @@ struct ExerciseLibraryView: View {
     @State private var pendingDeleteExercise: Exercise?
 
     var body: some View {
+        NavigationStack {
+            content
+                .navigationDestination(for: Exercise.self) { exercise in
+                    ExerciseHistoryView(exercise: exercise)
+                }
+        }
+    }
+
+    private var content: some View {
         Group {
             if exercises.isEmpty {
                 emptyState
@@ -76,9 +85,6 @@ struct ExerciseLibraryView: View {
             ForEach(groupedResults, id: \.group) { section in
                 Section {
                     ForEach(section.items) { exercise in
-                        // Value-based, not a view-builder link: this list shares the Library
-                        // stack with the Plans section, and a view-builder destination would
-                        // break every `NavigationLink(value:)` in that stack (see AGENT.md).
                         NavigationLink(value: exercise) {
                             row(for: exercise)
                         }
@@ -187,11 +193,6 @@ struct ExerciseLibraryView: View {
 }
 
 #Preview {
-    NavigationStack {
-        ExerciseLibraryView()
-            .navigationDestination(for: Exercise.self) { exercise in
-                ExerciseHistoryView(exercise: exercise)
-            }
-    }
-    .modelContainer(SampleData.container)
+    ExerciseLibraryView()
+        .modelContainer(SampleData.container)
 }

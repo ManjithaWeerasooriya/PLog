@@ -5,7 +5,7 @@
 //  The first thing on the Train tab: what to do today. With an active plan it names the
 //  suggested next day and offers one prominent "Start …" button, with the other days and a
 //  blank workout behind a secondary menu. With no plan it offers a blank workout and points
-//  at the Library. The daily action lives on-screen, not behind a toolbar menu.
+//  at the Plans tab. The daily action lives on-screen, not behind a toolbar menu.
 //
 
 import SwiftUI
@@ -81,7 +81,7 @@ struct TrainHeroCard: View {
         VStack(alignment: .leading, spacing: 4) {
             Text("No active plan")
                 .font(.title2.weight(.bold))
-            Text("Start one in Library to have sessions pre-filled.")
+            Text("Start one in Plans to have sessions pre-filled.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }

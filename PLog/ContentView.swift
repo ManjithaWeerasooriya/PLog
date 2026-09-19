@@ -3,8 +3,8 @@
 //  PLog
 //
 //  Root tab bar: Train (today's workout + the session log), Progress (analytics, with the
-//  calendar pushed from it) and the Library (plans and exercises behind a sub-nav). Settings
-//  is a sheet behind Train's profile button.
+//  calendar pushed from it), Plans and Exercises. Settings is a sheet behind Train's profile
+//  button. Each tab owns its own NavigationStack.
 //
 
 import SwiftUI
@@ -23,9 +23,14 @@ struct ContentView: View {
                     Label("Progress", systemImage: "chart.line.uptrend.xyaxis")
                 }
 
-            LibraryView()
+            PlanListView()
                 .tabItem {
-                    Label("Library", systemImage: "square.grid.2x2")
+                    Label("Plans", systemImage: "list.clipboard")
+                }
+
+            ExerciseLibraryView()
+                .tabItem {
+                    Label("Exercises", systemImage: "dumbbell")
                 }
         }
     }

@@ -82,7 +82,7 @@ struct DayDetailView: View {
             Text("Its exercises and sets will be removed.")
         }
         // A sheet rather than a push: this screen lives in three different stacks (Logs,
-        // Calendar, Library) and has no path of its own to push onto.
+        // Calendar, Plans) and has no path of its own to push onto.
         .sheet(item: $historyExercise) { exercise in
             NavigationStack {
                 ExerciseHistoryView(exercise: exercise)
