@@ -2,9 +2,10 @@
 //  PlanExerciseRow.swift
 //  PLog
 //
-//  One exercise slot in a day template. Collapsed it shows a "3 × 8" summary; tap it to
-//  reveal steppers for target sets × reps. Styled and behaved the same as `SetRow` — a
-//  plain row, expansion controlled by the parent so only one slot is open at a time.
+//  One exercise slot in a day template: a `DisclosureGroup` whose label shows the "3 × 8"
+//  summary and whose content is the target sets × reps steppers — the same system
+//  expand/collapse as `SetRow`, expansion controlled by the parent so only one slot is
+//  open at a time.
 //
 
 import SwiftUI
@@ -20,39 +21,26 @@ struct PlanExerciseRow: View {
     @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Button {
-                withAnimation(.snappy) { isExpanded.toggle() }
-            } label: {
-                header
-            }
-            // Keeps the List row highlight, but text resolves against the label color rather
-            // than the accent tint the default button style applies to its label.
-            .tint(.primary)
-            .accessibilityAddTraits(isExpanded ? [.isSelected] : [])
-            .accessibilityHint("Double-tap to edit target sets and reps")
-
-            if isExpanded {
-                // Side by side, stacked only at accessibility type sizes. Not `ViewThatFits`:
-                // it judges by *ideal* width and ignores the number's `minimumScaleFactor`,
-                // so a wider value like 102.5 silently tipped the pair into the stack.
-                Group {
-                    if typeSize.isAccessibilitySize {
-                        VStack(spacing: 16) { steppers }
-                    } else {
-                        HStack(alignment: .top, spacing: 16) { steppers }
-                    }
+        DisclosureGroup(isExpanded: $isExpanded) {
+            // Side by side, stacked only at accessibility type sizes — see `SetRow` for why
+            // this isn't a `ViewThatFits`.
+            Group {
+                if typeSize.isAccessibilitySize {
+                    VStack(spacing: 16) { steppers }
+                } else {
+                    HStack(alignment: .top, spacing: 16) { steppers }
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.bottom, 4)
-                // Fade in, but vanish instantly on collapse: the List row's height closes
-                // faster than a fade runs, so a fading removal left the labels hanging over
-                // the next row (or, with a move transition, sliding over the header).
-                .transition(.asymmetric(insertion: .opacity, removal: .identity))
             }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            // The steppers are a child row of the slot; swipes and reorder drags there must
+            // not act on the slot.
+            .deleteDisabled(true)
+            .moveDisabled(true)
+        } label: {
+            header
         }
-        .padding(.vertical, 4)
-        .clipped()
+        .accessibilityHint("Double-tap to edit target sets and reps")
     }
 
     @ViewBuilder
@@ -75,19 +63,14 @@ struct PlanExerciseRow: View {
                 Spacer()
                 targets
             }
-            Image(systemName: "chevron.right")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(.tertiary)
-                .rotationEffect(.degrees(isExpanded ? 90 : 0))
         }
-        .contentShape(Rectangle())
+        .padding(.vertical, 4)
     }
 
     private var nameAndChip: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(planExercise.exercise?.name ?? "Exercise")
                 .font(.headline)
-                .foregroundStyle(.primary)
             if let category = planExercise.exercise?.category {
                 CategoryChip(category: category)
             }

@@ -2,9 +2,11 @@
 //  SetRow.swift
 //  PLog
 //
-//  One set on the session screen. Collapsed it's a one-line summary with a trend badge;
-//  tap it to reveal the weight and reps steppers right below, in the same row. Edits bind
-//  straight into the model — there's no separate save step.
+//  One set on the session screen: a `DisclosureGroup` whose label is the one-line summary
+//  (set number, trend badge, weight × reps) and whose content is the weight and reps
+//  steppers. Using the system group means the expand/collapse motion, chevron and row
+//  insertion are the platform's own — the same as subtasks in Reminders. Edits bind
+//  straight into the model; there's no separate save step.
 //
 
 import SwiftUI
@@ -21,39 +23,25 @@ struct SetRow: View {
     @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
-        VStack(spacing: 12) {
-            Button {
-                withAnimation(.snappy) { isExpanded.toggle() }
-            } label: {
-                summary
-            }
-            // Keeps the List row highlight, but text resolves against the label color rather
-            // than the accent tint the default button style applies to its label.
-            .tint(.primary)
-            .accessibilityAddTraits(isExpanded ? [.isSelected] : [])
-            .accessibilityHint("Double-tap to edit")
-
-            if isExpanded {
-                // Side by side, stacked only at accessibility type sizes. Not `ViewThatFits`:
-                // it judges by *ideal* width and ignores the number's `minimumScaleFactor`,
-                // so a wider value like 102.5 silently tipped the pair into the stack.
-                Group {
-                    if typeSize.isAccessibilitySize {
-                        VStack(spacing: 16) { steppers }
-                    } else {
-                        HStack(alignment: .top, spacing: 16) { steppers }
-                    }
+        DisclosureGroup(isExpanded: $isExpanded) {
+            // Side by side, stacked only at accessibility type sizes. Not `ViewThatFits`:
+            // it judges by *ideal* width and ignores the number's `minimumScaleFactor`,
+            // so a wider value like 102.5 silently tipped the pair into the stack.
+            Group {
+                if typeSize.isAccessibilitySize {
+                    VStack(spacing: 16) { steppers }
+                } else {
+                    HStack(alignment: .top, spacing: 16) { steppers }
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.bottom, 4)
-                // Fade in, but vanish instantly on collapse: the List row's height closes
-                // faster than a fade runs, so a fading removal left the labels hanging over
-                // the next row (or, with a move transition, sliding over the header).
-                .transition(.asymmetric(insertion: .opacity, removal: .identity))
             }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            // The steppers are a child row of the set; a swipe there must not delete the set.
+            .deleteDisabled(true)
+        } label: {
+            summary
         }
-        .padding(.vertical, 4)
-        .clipped()
+        .accessibilityHint("Double-tap to edit")
     }
 
     @ViewBuilder
@@ -80,18 +68,13 @@ struct SetRow: View {
                 Spacer(minLength: 8)
                 numbers
             }
-            Image(systemName: "chevron.right")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(.tertiary)
-                .rotationEffect(.degrees(isExpanded ? 90 : 0))
         }
-        .contentShape(Rectangle())
+        .padding(.vertical, 4)
     }
 
     private var setLabel: some View {
         Text("Set \(set.setNumber)")
             .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.primary)
     }
 
     private var numbers: some View {
