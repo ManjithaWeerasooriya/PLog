@@ -35,3 +35,15 @@ extension Date {
         formatted(.dateTime.month(.abbreviated).day())
     }
 }
+
+extension Date {
+    /// e.g. "September 2026"
+    var monthYearLabel: String {
+        formatted(.dateTime.month(.wide).year())
+    }
+
+    /// e.g. "Friday, September 19"
+    var weekdayDateLabel: String {
+        formatted(.dateTime.weekday(.wide).month(.wide).day())
+    }
+}
