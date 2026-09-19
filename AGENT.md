@@ -1,6 +1,6 @@
 # PLog — Agent Reference
 
-iOS workout tracker for progressive overload. Lets the user log sets per exercise per session and see whether they improved versus the last time they did the same exercise. Workout plans (Push/Pull/Legs-style day templates) can be started/ended and stamp out pre-filled sessions. Four tabs: Logs, Plans, Exercises, Settings.
+iOS workout tracker for progressive overload. Lets the user log sets per exercise per session and see whether they improved versus the last time they did the same exercise. Workout plans (Push/Pull/Legs-style day templates) can be started/ended and stamp out pre-filled sessions. Five tabs: Logs, Calendar, Analytics, Library (Plans | Exercises behind a segmented sub-nav), Settings.
 
 ---
 
@@ -28,7 +28,7 @@ PLog/                        ← repo root
 │   └── project.pbxproj      ← uses PBXFileSystemSynchronizedRootGroup (see below)
 └── PLog/                    ← all Swift source lives here
     ├── PLogApp.swift         ← @main entry point, ModelContainer init
-    ├── ContentView.swift     ← root TabView (Logs + Plans + Exercises tabs)
+    ├── ContentView.swift     ← root TabView (Logs, Calendar, Analytics, Library, Settings)
     ├── Models/
     │   ├── MuscleGroup.swift        ← Codable enum, drives category chips + chart colors
     │   ├── Exercise.swift           ← reusable master-list exercise
@@ -55,6 +55,12 @@ PLog/                        ← repo root
     │   ├── Home/
     │   │   ├── HomeView.swift       ← Logs tab: sessions by month; "+" picks a plan day
     │   │   └── WorkoutDayRow.swift  ← one row: name, date, plan tag, exercise summary
+    │   ├── Calendar/
+    │   │   └── CalendarView.swift   ← Calendar tab: month grid, workout vs rest days, day detail
+    │   ├── Analytics/
+    │   │   ├── AnalyticsView.swift     ← Analytics tab: card dashboard + Swift Charts
+    │   │   ├── AnalyticsCard.swift     ← card tile, title, BigStat, ProgressRing
+    │   │   └── ActivityDotGrid.swift   ← 3-month "did I train?" dot grid
     │   ├── DayDetail/
     │   │   ├── DayDetailView.swift       ← editable session header + exercise list
     │   │   └── ExerciseEntryCard.swift   ← collapsible card per exercise
@@ -65,14 +71,15 @@ PLog/                        ← repo root
     │   ├── History/
     │   │   └── ExerciseHistoryView.swift ← Swift Charts line chart per exercise; Edit button
     │   ├── Plans/
-    │   │   ├── PlanListView.swift       ← Plans tab; owns NavigationPath + PlanRoute enum
+    │   │   ├── PlanListView.swift       ← Plans section of Library; declares PlanRoute enum
     │   │   ├── WorkoutPlanRow.swift     ← plan row + PlanStatusPill
     │   │   ├── PlanDetailView.swift     ← name, Start/End button, day list, link to log
     │   │   ├── PlanDayDetailView.swift  ← day template: name + exercise slots
     │   │   ├── PlanExerciseRow.swift    ← slot row with sets/reps wheel pickers
     │   │   └── PlanLogView.swift        ← date-by-date log with Rest Day gaps, "Up Next"
     │   ├── Library/
-    │   │   ├── ExerciseLibraryView.swift ← searchable master list, grouped by category
+    │   │   ├── LibraryView.swift         ← Library tab: Plans | Exercises sub-nav; owns the stack
+    │   │   ├── ExerciseLibraryView.swift ← Exercises section: searchable list by category
     │   │   └── AddExerciseView.swift     ← create OR edit (exercise: Exercise? param)
     │   └── Settings/
     │       └── SettingsView.swift    ← Settings tab: UserProfile form (name/gender/age/etc.)
@@ -81,6 +88,8 @@ PLog/                        ← repo root
         ├── WorkoutHistory.swift      ← read-only helpers: previousEntry, historyPoints
         ├── WorkoutLogger.swift       ← stamps a PlanDay into a WorkoutDay; suggestedNextDay
         ├── PlanTimeline.swift        ← builds PlanLogItem rows (sessions + rest days)
+        ├── WorkoutCalendar.swift     ← month grid cells + trained/rest/pending/inactive status
+        ├── WorkoutStats.swift        ← analytics aggregations: volume, weekly, split, streak, best lifts
         ├── StarterData.swift         ← first-launch seed: exercise library + 2 sample plans
         ├── AppTheme.swift            ← system/light/dark @AppStorage preference
         ├── Formatters.swift          ← WeightFormatter, Date extensions
@@ -177,13 +186,25 @@ Do not deviate from this pattern. Do not try to capture `@Environment` in an `in
 
 `HomeView` owns a `NavigationStack(path: $path)` with a typed `[WorkoutDay]` path. To push a newly created day immediately to its detail screen, call `path.append(day)` after inserting. Sheets are used for all editor flows (entry form, exercise picker, library actions).
 
-`PlanListView` owns a `NavigationPath` (mixed types: `WorkoutPlan`, `PlanDay`, `WorkoutDay`, `PlanRoute`) and registers every `navigationDestination(for:)` at the stack root. **Push everything by value** in this stack. A view-builder `NavigationLink { … }` leaves its destination outside the path and `NavigationLink(value:)` rows inside it silently do nothing (row highlights, no push) — that's why the log screen is reached via `PlanRoute.log(plan)`. Screens that need to push programmatically (`PlanLogView` after logging) take `path: Binding<NavigationPath>`.
+`LibraryView` (the Library tab) owns the single `NavigationStack` and `NavigationPath` that both of its sections share (mixed types: `WorkoutPlan`, `PlanDay`, `WorkoutDay`, `PlanRoute`, `Exercise`) and registers every `navigationDestination(for:)` at the stack root. `PlanListView` and `ExerciseLibraryView` are plain stack *content* — they set their own title/toolbar/`searchable` but must not wrap themselves in a `NavigationStack`. **Push everything by value** in this stack. A view-builder `NavigationLink { … }` leaves its destination outside the path and `NavigationLink(value:)` rows inside it silently do nothing (row highlights, no push) — that's why the log screen is reached via `PlanRoute.log(plan)` and why `ExerciseLibraryView` links to `ExerciseHistoryView` via `NavigationLink(value: exercise)`. Screens that need to push programmatically (`PlanListView` on "+", `PlanLogView` after logging) take `path: Binding<NavigationPath>`.
+
+The segmented Plans | Exercises picker is a `@State` in `LibraryView`, rendered as a `.principal` toolbar item with `.navigationBarTitleDisplayMode(.inline)` — i.e. it *replaces* the title in the nav bar. It was first tried as a view above the list, but Exercises' `.searchable` field lives in the nav bar, so the picker jumped down by a search bar's height on every switch; the nav bar is the only slot above the search field. The sections still set `.navigationTitle` so pushed screens get a proper back-button label. Switching sections is only possible at the stack root, so swapping the root view never orphans a pushed screen.
+
+`CalendarView` and `AnalyticsView` each own their own `NavigationStack` (typed `[WorkoutDay]` path → `DayDetailView`; and `Exercise` → `ExerciseHistoryView` respectively).
 
 ### Plans → sessions (the Logs tab)
 
 `WorkoutLogger.logWorkout(for:on:in:)` stamps a `PlanDay` template into a `WorkoutDay`: one `ExerciseEntry` per slot with `targetSets` sets at `targetReps`, weight prefilled from `WorkoutHistory.previousTopSet` — so logging a plan day means only adjusting weights. It's called from two places that must stay in sync: the **Logs tab** (`HomeView`'s "+" is a `Menu` of the active plan's days, with `WorkoutLogger.suggestedNextDay` flagged "Up next", plus "Blank Workout"; it's a plain button when no plan is active) and the plan's own log screen via `WorkoutPlanViewModel`. `DayDetailView` shows a "Plan Day" row for stamped sessions and passes `initiallyExpanded: true` to their cards.
 
 `PlanTimeline.items(for:workouts:)` produces the plan log rows: every calendar day from `startedAt` to `endedAt ?? today`; days with no session are rest days (today is shown as "Not logged yet" instead).
+
+### Calendar & Analytics are read-only over `@Query`
+
+Both tabs follow the list/read-screen pattern: `@Query` in the view, all math in pure helpers. `WorkoutCalendar.monthCells(for:workouts:historyStart:)` classifies every date as `.trained(sessions:)`, `.rest`, `.pending` (today, nothing logged) or `.inactive` (future, or before `historyStart`). **A rest day is only a past date on/after `historyStart`** — the earliest session or earliest `plan.startedAt` — so a fresh install isn't a wall of "rest days". `PlanTimeline` uses the same "no session = rest day" rule inside a plan's window; keep the two in agreement. The Analytics activity grid reuses these cells (`WorkoutCalendar.weeks` chunks them into 7-wide columns), so the two tabs can't disagree about which days count.
+
+`WorkoutStats` (weekly summaries, daily volumes, muscle split, week streak, best lifts) always returns fixed-width series that include empty periods as zeros, so bar charts keep a stable width. Weeks are bucketed by `Calendar.dateInterval(of: .weekOfYear)` start, honoring the device's first weekday. The "Best lifts" trend reuses `ProgressiveOverload.trend` on the last two sessions' top sets — don't compare raw weights there either. Volume totals display via `WeightFormatter.volumeString` (grouped, no decimals); individual weights still use `WeightFormatter.string`.
+
+`AnalyticsView`'s cards use `Color(uiColor: .secondarySystemGroupedBackground)` tiles on a `.systemGroupedBackground` scroll view so they look right in both themes; wrap any new widget in `AnalyticsCard` rather than inventing another card style.
 
 **Exactly one plan can be active.** `WorkoutPlanViewModel.start()` fetches every plan and sets `endedAt` on any other active one before starting this one. `HomeView` relies on this (`plans.first(where: \.isActive)`). Don't add another code path that sets `startedAt` without going through `start()`.
 

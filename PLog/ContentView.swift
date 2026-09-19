@@ -2,7 +2,8 @@
 //  ContentView.swift
 //  PLog
 //
-//  Root tab bar: your session logs, your training plans, and the reusable exercise library.
+//  Root tab bar: session logs, the training calendar, analytics, the library (plans and
+//  exercises behind a sub-nav), and settings.
 //
 
 import SwiftUI
@@ -16,14 +17,19 @@ struct ContentView: View {
                     Label("Logs", systemImage: "list.bullet.rectangle")
                 }
 
-            PlanListView()
+            CalendarView()
                 .tabItem {
-                    Label("Plans", systemImage: "list.clipboard")
+                    Label("Calendar", systemImage: "calendar")
                 }
 
-            ExerciseLibraryView()
+            AnalyticsView()
                 .tabItem {
-                    Label("Exercises", systemImage: "dumbbell")
+                    Label("Analytics", systemImage: "chart.bar.xaxis")
+                }
+
+            LibraryView()
+                .tabItem {
+                    Label("Library", systemImage: "square.grid.2x2")
                 }
 
             SettingsView()

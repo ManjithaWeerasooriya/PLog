@@ -2,14 +2,15 @@
 //  PlanListView.swift
 //  PLog
 //
-//  The Plans tab: the currently active plan on top, every other plan below. Tap "+" to
-//  create a plan and jump straight into editing it.
+//  The Plans section of the Library tab: the currently active plan on top, every other plan
+//  below. Tap "+" to create a plan and jump straight into editing it. The owning
+//  `NavigationStack` (and every `navigationDestination`) lives in `LibraryView`.
 //
 
 import SwiftUI
 import SwiftData
 
-/// Non-model screens reachable in the Plans stack. Everything is pushed by value so that
+/// Non-model screens reachable in the Library stack. Everything is pushed by value so that
 /// value-based links keep working from any depth (a view-builder `NavigationLink` would
 /// leave its destination outside the path and break `NavigationLink(value:)` inside it).
 enum PlanRoute: Hashable {
@@ -26,8 +27,8 @@ struct PlanListView: View {
 
     @Query(sort: \WorkoutPlan.createdAt, order: .reverse) private var plans: [WorkoutPlan]
 
-    /// Mixed-type path: plans, day templates, and logged workout days all push onto it.
-    @State private var path = NavigationPath()
+    /// The Library tab's shared path, so "+" can push the new plan straight into editing.
+    @Binding var path: NavigationPath
 
     /// Plans staged for deletion, pending the confirmation dialog below.
     @State private var pendingDeletePlans: [WorkoutPlan] = []
@@ -36,57 +37,38 @@ struct PlanListView: View {
     @State private var showingActivePlanBlockedAlert = false
 
     var body: some View {
-        NavigationStack(path: $path) {
-            Group {
-                if plans.isEmpty {
-                    emptyState
-                } else {
-                    planList
+        Group {
+            if plans.isEmpty {
+                emptyState
+            } else {
+                planList
+            }
+        }
+        .navigationTitle("Plans")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button(action: createPlan) {
+                    Label("New Plan", systemImage: "plus")
                 }
             }
-            .navigationTitle("Plans")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button(action: createPlan) {
-                        Label("New Plan", systemImage: "plus")
-                    }
-                }
-            }
-            .navigationDestination(for: WorkoutPlan.self) { plan in
-                PlanDetailView(plan: plan, context: context)
-            }
-            .navigationDestination(for: PlanDay.self) { day in
-                PlanDayDetailView(day: day)
-            }
-            .navigationDestination(for: WorkoutDay.self) { day in
-                DayDetailView(day: day)
-            }
-            .navigationDestination(for: PlanRoute.self) { route in
-                switch route {
-                case .log(let plan):
-                    PlanLogView(plan: plan, context: context, path: $path)
-                case .newPlan(let plan):
-                    PlanDetailView(plan: plan, context: context, isNewlyCreated: true)
-                }
-            }
-            // `.alert` rather than `.confirmationDialog`: the latter renders (at least on
-            // this iOS version) as a small anchored callout that latches onto an arbitrary
-            // ancestor view instead of the swiped row, landing near the top of the list and
-            // pointing at the wrong plan entirely. A centered alert has no anchor to get wrong.
-            .alert(
-                deleteConfirmationTitle,
-                isPresented: $showingDeleteConfirmation
-            ) {
-                Button("Delete", role: .destructive, action: confirmDelete)
-                Button("Cancel", role: .cancel) { pendingDeletePlans = [] }
-            } message: {
-                Text("This removes its day templates. Workouts you've already logged are kept.")
-            }
-            .alert("Can't Delete an Active Plan", isPresented: $showingActivePlanBlockedAlert) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text("End the plan before deleting it.")
-            }
+        }
+        // `.alert` rather than `.confirmationDialog`: the latter renders (at least on
+        // this iOS version) as a small anchored callout that latches onto an arbitrary
+        // ancestor view instead of the swiped row, landing near the top of the list and
+        // pointing at the wrong plan entirely. A centered alert has no anchor to get wrong.
+        .alert(
+            deleteConfirmationTitle,
+            isPresented: $showingDeleteConfirmation
+        ) {
+            Button("Delete", role: .destructive, action: confirmDelete)
+            Button("Cancel", role: .cancel) { pendingDeletePlans = [] }
+        } message: {
+            Text("This removes its day templates. Workouts you've already logged are kept.")
+        }
+        .alert("Can't Delete an Active Plan", isPresented: $showingActivePlanBlockedAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("End the plan before deleting it.")
         }
     }
 
@@ -193,6 +175,14 @@ struct PlanListView: View {
 }
 
 #Preview {
-    PlanListView()
+    struct Demo: View {
+        @State private var path = NavigationPath()
+        var body: some View {
+            NavigationStack(path: $path) {
+                PlanListView(path: $path)
+            }
+        }
+    }
+    return Demo()
         .modelContainer(SampleData.container)
 }

@@ -2,8 +2,9 @@
 //  ExerciseLibraryView.swift
 //  PLog
 //
-//  The master exercise list: searchable, grouped by muscle group, with add/edit/delete.
-//  Tapping an exercise opens its progress history.
+//  The Exercises section of the Library tab: the master list, searchable, grouped by muscle
+//  group, with add/edit/delete. Tapping an exercise opens its progress history. The owning
+//  `NavigationStack` (and the `Exercise` destination) lives in `LibraryView`.
 //
 
 import SwiftUI
@@ -26,47 +27,45 @@ struct ExerciseLibraryView: View {
     @State private var pendingDeleteExercise: Exercise?
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if exercises.isEmpty {
-                    emptyState
-                } else {
-                    libraryList
+        Group {
+            if exercises.isEmpty {
+                emptyState
+            } else {
+                libraryList
+            }
+        }
+        .navigationTitle("Exercises")
+        .searchable(text: $searchText, prompt: "Search exercises")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showingAddExercise = true
+                } label: {
+                    Label("Add Exercise", systemImage: "plus")
                 }
             }
-            .navigationTitle("Exercises")
-            .searchable(text: $searchText, prompt: "Search exercises")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showingAddExercise = true
-                    } label: {
-                        Label("Add Exercise", systemImage: "plus")
-                    }
+            ToolbarItem(placement: .topBarLeading) {
+                categoryMenu
+            }
+        }
+        .sheet(isPresented: $showingAddExercise) {
+            AddExerciseView()
+        }
+        .sheet(item: $editingExercise) { exercise in
+            AddExerciseView(exercise: exercise)
+        }
+        .alert(
+            deleteConfirmationTitle,
+            isPresented: isShowingDeleteConfirmation
+        ) {
+            Button("Delete", role: .destructive) {
+                if let pendingDeleteExercise {
+                    confirmDelete(pendingDeleteExercise)
                 }
-                ToolbarItem(placement: .topBarLeading) {
-                    categoryMenu
-                }
             }
-            .sheet(isPresented: $showingAddExercise) {
-                AddExerciseView()
-            }
-            .sheet(item: $editingExercise) { exercise in
-                AddExerciseView(exercise: exercise)
-            }
-            .alert(
-                deleteConfirmationTitle,
-                isPresented: isShowingDeleteConfirmation
-            ) {
-                Button("Delete", role: .destructive) {
-                    if let pendingDeleteExercise {
-                        confirmDelete(pendingDeleteExercise)
-                    }
-                }
-                Button("Cancel", role: .cancel) { pendingDeleteExercise = nil }
-            } message: {
-                Text("Logged sets that used it are kept, just no longer linked to an exercise.")
-            }
+            Button("Cancel", role: .cancel) { pendingDeleteExercise = nil }
+        } message: {
+            Text("Logged sets that used it are kept, just no longer linked to an exercise.")
         }
     }
 
@@ -77,9 +76,10 @@ struct ExerciseLibraryView: View {
             ForEach(groupedResults, id: \.group) { section in
                 Section {
                     ForEach(section.items) { exercise in
-                        NavigationLink {
-                            ExerciseHistoryView(exercise: exercise)
-                        } label: {
+                        // Value-based, not a view-builder link: this list shares the Library
+                        // stack with the Plans section, and a view-builder destination would
+                        // break every `NavigationLink(value:)` in that stack (see AGENT.md).
+                        NavigationLink(value: exercise) {
                             row(for: exercise)
                         }
                         .swipeActions(edge: .leading) {
@@ -187,6 +187,11 @@ struct ExerciseLibraryView: View {
 }
 
 #Preview {
-    ExerciseLibraryView()
-        .modelContainer(SampleData.container)
+    NavigationStack {
+        ExerciseLibraryView()
+            .navigationDestination(for: Exercise.self) { exercise in
+                ExerciseHistoryView(exercise: exercise)
+            }
+    }
+    .modelContainer(SampleData.container)
 }
