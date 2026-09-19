@@ -75,10 +75,15 @@ struct NumberStepper: View {
                 .foregroundStyle(.secondary)
                 .textCase(.uppercase)
                 .tracking(0.5)
-            HStack(spacing: 12) {
+            // Sized to content, not stretched: two of these share a phone-width row, and
+            // four 44-pt buttons already take most of it. `.title2` (not `.title`) and the
+            // narrow minimum are what let a 5-glyph weight ("120.5") sit beside a 1-digit
+            // rep count without truncating; the row's HStack hands leftover width to the
+            // wider number on its own.
+            HStack(spacing: 8) {
                 stepButton(systemImage: "minus", delta: -step, size: max(44, heroButtonSize))
-                numberView(font: .system(.title, design: .rounded, weight: .bold))
-                    .frame(maxWidth: .infinity)
+                numberView(font: .system(.title2, design: .rounded, weight: .bold))
+                    .frame(minWidth: 36)
                 stepButton(systemImage: "plus", delta: step, size: max(44, heroButtonSize))
             }
             if let unit {
@@ -87,7 +92,6 @@ struct NumberStepper: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .frame(maxWidth: .infinity)
     }
 
     private var rowLayout: some View {

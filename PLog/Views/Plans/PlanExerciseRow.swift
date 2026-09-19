@@ -33,15 +33,26 @@ struct PlanExerciseRow: View {
             .accessibilityHint("Double-tap to edit target sets and reps")
 
             if isExpanded {
-                // Side by side while they fit; stacked at accessibility type sizes.
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: 24) { steppers }
-                    VStack(spacing: 16) { steppers }
+                // Side by side, stacked only at accessibility type sizes. Not `ViewThatFits`:
+                // it judges by *ideal* width and ignores the number's `minimumScaleFactor`,
+                // so a wider value like 102.5 silently tipped the pair into the stack.
+                Group {
+                    if typeSize.isAccessibilitySize {
+                        VStack(spacing: 16) { steppers }
+                    } else {
+                        HStack(alignment: .top, spacing: 16) { steppers }
+                    }
                 }
+                .frame(maxWidth: .infinity)
                 .padding(.bottom, 4)
+                // Fade in, but vanish instantly on collapse: the List row's height closes
+                // faster than a fade runs, so a fading removal left the labels hanging over
+                // the next row (or, with a move transition, sliding over the header).
+                .transition(.asymmetric(insertion: .opacity, removal: .identity))
             }
         }
         .padding(.vertical, 4)
+        .clipped()
     }
 
     @ViewBuilder
