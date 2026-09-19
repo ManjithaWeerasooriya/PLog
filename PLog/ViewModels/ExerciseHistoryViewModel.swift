@@ -20,6 +20,17 @@ final class ExerciseHistoryViewModel {
         case oneRepMax = "Est. 1RM"
 
         var id: String { rawValue }
+
+        /// Fits four segments across a phone; `rawValue` is the full chart title.
+        var shortLabel: String {
+            switch self {
+            case .weight: return "Weight"
+            case .reps: return "Reps"
+            case .volume: return "Volume"
+            case .oneRepMax: return "1RM"
+            }
+        }
+
         var unit: String {
             switch self {
             case .weight, .volume, .oneRepMax: return "kg"

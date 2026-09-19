@@ -23,7 +23,7 @@ struct ExerciseHistoryView: View {
             Section {
                 Picker("Metric", selection: $viewModel.selectedMetric) {
                     ForEach(ExerciseHistoryViewModel.Metric.allCases) { metric in
-                        Text(metric.rawValue).tag(metric)
+                        Text(metric.shortLabel).tag(metric)
                     }
                 }
                 .pickerStyle(.segmented)

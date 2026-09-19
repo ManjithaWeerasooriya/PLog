@@ -116,7 +116,7 @@ struct ExerciseLibraryView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(exercise.name)
                 let sessions = exercise.entries.filter { $0.workoutDay != nil }.count
-                Text(sessions == 0 ? "No sessions yet" : "\(sessions) sessions logged")
+                Text(sessions == 0 ? "No sessions yet" : "\(sessions) \(sessions == 1 ? "session" : "sessions") logged")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
