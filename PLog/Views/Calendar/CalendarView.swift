@@ -19,6 +19,11 @@ struct CalendarView: View {
 
     private let calendar = Calendar.current
 
+    // Scaled with the type size so the day circles and dots keep pace with their numbers.
+    @ScaledMetric(relativeTo: .callout) private var cellSize = 34
+    @ScaledMetric(relativeTo: .callout) private var statusDotSize = 6
+    @ScaledMetric(relativeTo: .caption) private var legendDot = 10
+
     var body: some View {
         NavigationStack(path: $path) {
             List {
@@ -80,7 +85,7 @@ struct CalendarView: View {
                 // usable identity.
                 ForEach(Array(WorkoutCalendar.weekdaySymbols(calendar: calendar).enumerated()), id: \.offset) { _, symbol in
                     Text(symbol)
-                        .font(.caption2.weight(.semibold))
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -90,7 +95,7 @@ struct CalendarView: View {
                     if let cell {
                         dayCell(cell)
                     } else {
-                        Color.clear.frame(height: 44)
+                        Color.clear.frame(height: cellSize + 10)
                     }
                 }
             }
@@ -113,7 +118,7 @@ struct CalendarView: View {
                     .font(.callout.weight(cell.isToday ? .bold : .regular))
                     .monospacedDigit()
                     .foregroundStyle(numberColor(for: cell))
-                    .frame(width: 34, height: 34)
+                    .frame(width: cellSize, height: cellSize)
                     .background {
                         if isTrained {
                             Circle().fill(Color.accentColor)
@@ -130,9 +135,9 @@ struct CalendarView: View {
                     }
 
                 statusDot(for: cell.status)
-                    .frame(width: 6, height: 6)
+                    .frame(width: statusDotSize, height: statusDotSize)
             }
-            .frame(maxWidth: .infinity, minHeight: 44)
+            .frame(maxWidth: .infinity, minHeight: max(44, cellSize + 10))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -164,12 +169,12 @@ struct CalendarView: View {
             Label {
                 Text("Workout")
             } icon: {
-                Circle().fill(Color.accentColor).frame(width: 10, height: 10)
+                Circle().fill(Color.accentColor).frame(width: legendDot, height: legendDot)
             }
             Label {
                 Text("Rest day")
             } icon: {
-                Circle().strokeBorder(Color.secondary, lineWidth: 1).frame(width: 10, height: 10)
+                Circle().strokeBorder(Color.secondary, lineWidth: 1).frame(width: legendDot, height: legendDot)
             }
             Spacer()
         }

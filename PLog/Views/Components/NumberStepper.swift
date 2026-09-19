@@ -31,6 +31,10 @@ struct NumberStepper: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    // Button diameters scale with the type size; the hero one never drops below 44 pt.
+    @ScaledMetric(relativeTo: .title) private var heroButtonSize = 44
+    @ScaledMetric(relativeTo: .body) private var rowButtonSize = 32
+
     /// Direct-entry state. The text is seeded once from `value` when editing begins, not
     /// re-derived on every keystroke — reformatting mid-entry would drop a just-typed "."
     /// and make "62.5" impossible to type.
@@ -72,10 +76,10 @@ struct NumberStepper: View {
                 .textCase(.uppercase)
                 .tracking(0.5)
             HStack(spacing: 12) {
-                stepButton(systemImage: "minus", delta: -step)
+                stepButton(systemImage: "minus", delta: -step, size: max(44, heroButtonSize))
                 numberView(font: .system(.title, design: .rounded, weight: .bold))
                     .frame(maxWidth: .infinity)
-                stepButton(systemImage: "plus", delta: step)
+                stepButton(systemImage: "plus", delta: step, size: max(44, heroButtonSize))
             }
             if let unit {
                 Text(unit)
@@ -91,7 +95,7 @@ struct NumberStepper: View {
             Text(title)
             Spacer()
             HStack(spacing: 8) {
-                stepButton(systemImage: "minus", delta: -step, size: 32)
+                stepButton(systemImage: "minus", delta: -step, size: rowButtonSize)
                 HStack(alignment: .firstTextBaseline, spacing: 3) {
                     numberView(font: .body.weight(.semibold))
                     if let unit {
@@ -101,7 +105,7 @@ struct NumberStepper: View {
                     }
                 }
                 .frame(minWidth: 64)
-                stepButton(systemImage: "plus", delta: step, size: 32)
+                stepButton(systemImage: "plus", delta: step, size: rowButtonSize)
             }
         }
     }
@@ -144,7 +148,7 @@ struct NumberStepper: View {
 
     // MARK: - Step buttons
 
-    private func stepButton(systemImage: String, delta: Double, size: CGFloat = 44) -> some View {
+    private func stepButton(systemImage: String, delta: Double, size: CGFloat) -> some View {
         RepeatButton(size: size) {
             apply(delta)
         } label: {

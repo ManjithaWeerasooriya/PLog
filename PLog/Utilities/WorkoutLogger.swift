@@ -26,8 +26,9 @@ enum WorkoutLogger {
     }
 
     /// Creates a `WorkoutDay` from a template: one entry per exercise slot, each with
-    /// `targetSets` sets at `targetReps`, and the weight prefilled from the last session —
-    /// so the user only has to adjust weights.
+    /// `targetSets` sets at `targetReps`, and each set's weight prefilled from the
+    /// same-numbered set last session (falling back to the top set) — so the user only has
+    /// to adjust weights, and a back-off set comes in at its usual load.
     ///
     /// Relationships are appended from the to-many side so Observation fires on the parents.
     @discardableResult
@@ -46,11 +47,14 @@ enum WorkoutLogger {
             context.insert(entry)
             day.entries.append(entry)
 
-            let lastWeight = WorkoutHistory.previousTopSet(for: exercise, excluding: entry)?.weight ?? 0
+            let previousSets = WorkoutHistory.previousSets(for: exercise, excluding: entry)
+            let topWeight = WorkoutHistory.previousTopSet(for: exercise, excluding: entry)?.weight ?? 0
             for setNumber in stride(from: 1, through: slot.targetSets, by: 1) {
+                let index = setNumber - 1
+                let weight = previousSets.indices.contains(index) ? previousSets[index].weight : topWeight
                 let set = SetEntry(
                     setNumber: setNumber,
-                    weight: lastWeight,
+                    weight: weight,
                     reps: slot.targetReps
                 )
                 context.insert(set)

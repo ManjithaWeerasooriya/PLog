@@ -30,6 +30,13 @@ struct AnalyticsView: View {
 
     @State private var range: AnalyticsRange = .twelveWeeks
 
+    // Scaled with the type size so the ring and legend dots keep pace with their labels.
+    // The donut stays fixed: it's a chart, and at accessibility sizes its legend drops
+    // beneath it instead.
+    @ScaledMetric(relativeTo: .title2) private var ringSize = 64
+    @ScaledMetric(relativeTo: .caption) private var legendDot = 7
+    private let donutSize: CGFloat = 136
+
     private let calendar = Calendar.current
 
     var body: some View {
@@ -53,11 +60,18 @@ struct AnalyticsView: View {
     private var dashboard: some View {
         ScrollView {
             VStack(spacing: 12) {
-                HStack(spacing: 12) {
-                    planCard
-                    bodyWeightCard
+                // Side by side while they fit; stacked at accessibility type sizes.
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) {
+                        planCard
+                        bodyWeightCard
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                    VStack(spacing: 12) {
+                        planCard
+                        bodyWeightCard
+                    }
                 }
-                .fixedSize(horizontal: false, vertical: true)
 
                 activityCard
                 weekVolumeCard
@@ -96,7 +110,7 @@ struct AnalyticsView: View {
                             .font(.title2.bold())
                             .monospacedDigit()
                     }
-                    .frame(width: 64, height: 64)
+                    .frame(width: ringSize, height: ringSize)
                     Spacer(minLength: 0)
                     AnalyticsCardTitle(
                         title: plan.name.isEmpty ? "Plan" : plan.name,
@@ -107,7 +121,7 @@ struct AnalyticsView: View {
                         Image(systemName: "pause.fill")
                             .foregroundStyle(.secondary)
                     }
-                    .frame(width: 64, height: 64)
+                    .frame(width: ringSize, height: ringSize)
                     Spacer(minLength: 0)
                     AnalyticsCardTitle(title: "No active plan", subtitle: "Start one in Library")
                 }
@@ -164,7 +178,7 @@ struct AnalyticsView: View {
 
     private func legendItem(color: Color, text: String) -> some View {
         HStack(spacing: 5) {
-            Circle().fill(color).frame(width: 7, height: 7)
+            Circle().fill(color).frame(width: legendDot, height: legendDot)
             Text(text)
         }
     }
@@ -174,17 +188,13 @@ struct AnalyticsView: View {
     private var weekVolumeCard: some View {
         AnalyticsCard {
             VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .top) {
-                    AnalyticsCardTitle(title: "Volume lifted", subtitle: "Last 7 days")
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 4) {
-                        BigStat(value: WeightFormatter.volumeString(last7Volume), unit: "kg", size: 32)
-                        if let change = WorkoutStats.percentChange(from: previous7Volume, to: last7Volume) {
-                            TrendBadge(
-                                trend: change > 0.5 ? .improved : (change < -0.5 ? .regressed : .matched),
-                                text: "\(change > 0 ? "+" : "")\(Int(change.rounded()))% vs prior week"
-                            )
-                        }
+                cardHeader(title: "Volume lifted", subtitle: "Last 7 days") {
+                    BigStat(value: WeightFormatter.volumeString(last7Volume), unit: "kg", style: .title)
+                    if let change = WorkoutStats.percentChange(from: previous7Volume, to: last7Volume) {
+                        TrendBadge(
+                            trend: change > 0.5 ? .improved : (change < -0.5 ? .regressed : .matched),
+                            text: "\(change > 0 ? "+" : "")\(Int(change.rounded()))% vs prior week"
+                        )
                     }
                 }
 
@@ -203,6 +213,7 @@ struct AnalyticsView: View {
                 }
                 .chartYAxis(.hidden)
                 .frame(height: 72)
+                .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
             }
         }
     }
@@ -210,18 +221,28 @@ struct AnalyticsView: View {
     // MARK: - Totals
 
     private var totalsRow: some View {
-        HStack(spacing: 12) {
-            miniStat(value: "\(workouts.count)", label: "Workouts")
-            miniStat(value: WeightFormatter.volumeString(Double(totalSets)), label: "Sets")
-            miniStat(value: "\(streak)", label: streak == 1 ? "Week streak" : "Weeks streak")
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                totalStats
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            VStack(spacing: 12) {
+                totalStats
+            }
         }
-        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    @ViewBuilder
+    private var totalStats: some View {
+        miniStat(value: "\(workouts.count)", label: "Workouts")
+        miniStat(value: WeightFormatter.volumeString(Double(totalSets)), label: "Sets")
+        miniStat(value: "\(streak)", label: streak == 1 ? "Week streak" : "Weeks streak")
     }
 
     private func miniStat(value: String, label: String) -> some View {
         AnalyticsCard {
             VStack(alignment: .leading, spacing: 4) {
-                BigStat(value: value, size: 26)
+                BigStat(value: value, style: .title2)
                 Text(label)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -234,28 +255,40 @@ struct AnalyticsView: View {
     // MARK: - Trends
 
     private var trendsHeader: some View {
-        HStack {
-            Text("Trends")
-                .font(.title3.weight(.semibold))
-            Spacer()
-            Picker("Range", selection: $range) {
-                ForEach(AnalyticsRange.allCases) { range in
-                    Text(range.label).tag(range)
-                }
+        ViewThatFits(in: .horizontal) {
+            HStack {
+                trendsTitle
+                Spacer()
+                rangePicker
+                    .fixedSize()
             }
-            .pickerStyle(.segmented)
-            .frame(width: 170)
+            VStack(alignment: .leading, spacing: 8) {
+                trendsTitle
+                rangePicker
+            }
         }
         .padding(.top, 8)
+    }
+
+    private var trendsTitle: some View {
+        Text("Trends")
+            .font(.title3.weight(.semibold))
+    }
+
+    private var rangePicker: some View {
+        Picker("Range", selection: $range) {
+            ForEach(AnalyticsRange.allCases) { range in
+                Text(range.label).tag(range)
+            }
+        }
+        .pickerStyle(.segmented)
     }
 
     private var weeklyVolumeCard: some View {
         AnalyticsCard {
             VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .top) {
-                    AnalyticsCardTitle(title: "Weekly volume", subtitle: "kg lifted per week")
-                    Spacer()
-                    BigStat(value: WeightFormatter.volumeString(averageWeeklyVolume), unit: "kg avg", size: 24)
+                cardHeader(title: "Weekly volume", subtitle: "kg lifted per week") {
+                    BigStat(value: WeightFormatter.volumeString(averageWeeklyVolume), unit: "kg avg", style: .title2)
                 }
                 Chart(weekly) { week in
                     BarMark(
@@ -267,6 +300,7 @@ struct AnalyticsView: View {
                 }
                 .chartXAxis { weeklyAxis }
                 .frame(height: 160)
+                .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
             }
         }
     }
@@ -274,10 +308,8 @@ struct AnalyticsView: View {
     private var sessionsCard: some View {
         AnalyticsCard {
             VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .top) {
-                    AnalyticsCardTitle(title: "Sessions per week", subtitle: "Consistency")
-                    Spacer()
-                    BigStat(value: String(format: "%.1f", averageWeeklySessions), unit: "avg", size: 24)
+                cardHeader(title: "Sessions per week", subtitle: "Consistency") {
+                    BigStat(value: String(format: "%.1f", averageWeeklySessions), unit: "avg", style: .title2)
                 }
                 Chart {
                     ForEach(weekly) { week in
@@ -294,7 +326,7 @@ struct AnalyticsView: View {
                             .foregroundStyle(.secondary)
                             .annotation(position: .top, alignment: .leading) {
                                 Text("Plan: \(target)/wk")
-                                    .font(.caption2)
+                                    .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
                     }
@@ -307,6 +339,7 @@ struct AnalyticsView: View {
                     }
                 }
                 .frame(height: 160)
+                .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
             }
         }
     }
@@ -332,50 +365,76 @@ struct AnalyticsView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 } else {
-                    HStack(spacing: 20) {
-                        Chart(split) { share in
-                            SectorMark(
-                                angle: .value("Sets", share.sets),
-                                innerRadius: .ratio(0.66),
-                                angularInset: 1.5
-                            )
-                            .foregroundStyle(share.group.color)
-                            .cornerRadius(3)
-                        }
-                        .chartLegend(.hidden)
-                        .frame(width: 136, height: 136)
-                        .overlay {
-                            VStack(spacing: 0) {
-                                Text("\(total)")
-                                    .font(.title2.bold())
-                                    .monospacedDigit()
-                                Text("sets")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-
-                        VStack(alignment: .leading, spacing: 8) {
-                            ForEach(split.prefix(5)) { share in
-                                HStack(spacing: 8) {
-                                    Circle().fill(share.group.color).frame(width: 8, height: 8)
-                                    Text(share.group.displayName)
-                                        .font(.subheadline)
-                                        .lineLimit(1)
-                                    Spacer()
-                                    Text("\(Int((Double(share.sets) / Double(max(total, 1)) * 100).rounded()))%")
-                                        .font(.subheadline.monospacedDigit())
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            if split.count > 5 {
-                                Text("+\(split.count - 5) more")
-                                    .font(.caption)
-                                    .foregroundStyle(.tertiary)
-                            }
-                        }
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 20) { muscleSplitContent(split, total: total) }
+                        VStack(alignment: .leading, spacing: 16) { muscleSplitContent(split, total: total) }
                     }
                 }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func muscleSplitContent(_ split: [WorkoutStats.MuscleGroupShare], total: Int) -> some View {
+        Chart(split) { share in
+            SectorMark(
+                angle: .value("Sets", share.sets),
+                innerRadius: .ratio(0.66),
+                angularInset: 1.5
+            )
+            .foregroundStyle(share.group.color)
+            .cornerRadius(3)
+        }
+        .chartLegend(.hidden)
+        .frame(width: donutSize, height: donutSize)
+        .overlay {
+            VStack(spacing: 0) {
+                Text("\(total)")
+                    .font(.title2.bold())
+                    .monospacedDigit()
+                Text("sets")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(split.prefix(5)) { share in
+                HStack(spacing: 8) {
+                    Circle().fill(share.group.color).frame(width: legendDot, height: legendDot)
+                    Text(share.group.displayName)
+                        .font(.subheadline)
+                        .lineLimit(1)
+                    Spacer()
+                    Text("\(Int((Double(share.sets) / Double(max(total, 1)) * 100).rounded()))%")
+                        .font(.subheadline.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+            }
+            if split.count > 5 {
+                Text("+\(split.count - 5) more")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    /// Title/subtitle leading with a stat trailing — or, when the stat no longer fits
+    /// beside the title at large type sizes, the stat beneath it.
+    private func cardHeader<Trailing: View>(
+        title: String,
+        subtitle: String,
+        @ViewBuilder trailing: () -> Trailing
+    ) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top) {
+                AnalyticsCardTitle(title: title, subtitle: subtitle)
+                Spacer()
+                VStack(alignment: .trailing, spacing: 4) { trailing() }
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                AnalyticsCardTitle(title: title, subtitle: subtitle)
+                VStack(alignment: .leading, spacing: 4) { trailing() }
             }
         }
     }

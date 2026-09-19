@@ -76,7 +76,7 @@ enum MuscleGroup: String, Codable, CaseIterable, Identifiable {
         case .traps: return .indigo
         case .triceps: return .mint
         case .forearms: return .cyan
-        case .core: return .yellow
+        case .core: return .brown  // not yellow: unusable even as a fill/icon on a light card
         case .cardio: return .pink
         case .fullBody: return .teal
         case .other: return .gray

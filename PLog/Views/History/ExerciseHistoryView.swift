@@ -90,6 +90,7 @@ struct ExerciseHistoryView: View {
                     .foregroundStyle(viewModel.exercise.category.color)
                 }
                 .frame(height: 220)
+                .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                 .chartYScale(domain: .automatic(includesZero: false))
             }
             .padding(.vertical, 8)

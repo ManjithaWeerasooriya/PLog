@@ -23,6 +23,8 @@ struct ExerciseEntryRows: View {
     /// Removes this exercise from the day (the parent owns deletion).
     var onDelete: () -> Void
 
+    @Environment(\.dynamicTypeSize) private var typeSize
+
     /// Context is passed in explicitly because `@Environment` isn't available during `init`,
     /// and the view model needs it to insert/delete sets.
     init(
@@ -70,23 +72,28 @@ struct ExerciseEntryRows: View {
             withAnimation(.snappy) { isExpanded.toggle() }
         } label: {
             HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(viewModel.exerciseName)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                    if let category = entry.exercise?.category {
-                        CategoryChip(category: category)
-                    }
-                }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("^[\(entry.sets.count) set](inflect: true)")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.primary)
-                    if entry.topWeight > 0 {
-                        Text("Top: \(WeightFormatter.string(entry.topWeight)) kg")
-                            .font(.caption)
+                // Name/chip lead and the set summary trails — until accessibility sizes,
+                // where side-by-side columns wrap into single words; then it all stacks.
+                if typeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 6) {
+                        nameAndChip
+                        Text(setSummary)
+                            .font(.subheadline)
                             .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                } else {
+                    nameAndChip
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("^[\(entry.sets.count) set](inflect: true)")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.primary)
+                        if entry.topWeight > 0 {
+                            Text("Top: \(WeightFormatter.string(entry.topWeight)) kg")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
                 Image(systemName: "chevron.right")
@@ -132,10 +139,31 @@ struct ExerciseEntryRows: View {
         }
     }
 
+    private var nameAndChip: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(viewModel.exerciseName)
+                .font(.headline)
+                .foregroundStyle(.primary)
+            if let category = entry.exercise?.category {
+                CategoryChip(category: category)
+            }
+        }
+    }
+
+    /// e.g. "3 sets · Top: 60 kg" — the stacked layout's one-line summary.
+    private var setSummary: String {
+        // Plain pluralisation: the `^[…](inflect:)` markup only works in a `Text` literal.
+        var parts = ["\(entry.sets.count) \(entry.sets.count == 1 ? "set" : "sets")"]
+        if entry.topWeight > 0 {
+            parts.append("Top: \(WeightFormatter.string(entry.topWeight)) kg")
+        }
+        return parts.joined(separator: " · ")
+    }
+
     private var addSetRow: some View {
         Button {
             withAnimation(.snappy) {
-                let added = viewModel.addDuplicateSet()
+                let added = viewModel.addSet()
                 expandedSetID = added.persistentModelID
             }
         } label: {

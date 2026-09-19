@@ -2,8 +2,7 @@
 //  PlanLogView.swift
 //  PLog
 //
-//  The day-by-day log for a plan: every date from the start of the plan until today (or its
-//  end), with logged sessions as tappable rows and untrained dates marked "Rest Day".
+//  The log for a plan: every session logged against it, newest first, grouped by month.
 //  Logging a new session stamps out the chosen day template and opens it for editing.
 //
 
@@ -18,8 +17,8 @@ struct PlanLogView: View {
     /// `WorkoutDay` destination and break the value-based row links.)
     @Binding var path: NavigationPath
 
-    /// All sessions, filtered to the plan's window in `timeline`. `@Query` keeps the log live
-    /// whether a session is logged here or from the Workouts tab.
+    /// All sessions, filtered to this plan's in `sessions`. `@Query` keeps the log live
+    /// whether a session is logged here or from the Logs tab.
     @Query(sort: \WorkoutDay.date, order: .reverse) private var allDays: [WorkoutDay]
 
     init(plan: WorkoutPlan, context: ModelContext, path: Binding<NavigationPath>) {
@@ -68,41 +67,26 @@ struct PlanLogView: View {
                 }
             }
 
+            if sections.isEmpty {
+                Section {
+                    ContentUnavailableView {
+                        Label("No Workouts Yet", systemImage: "figure.strengthtraining.traditional")
+                    } description: {
+                        Text("Sessions you log against this plan show up here.")
+                    }
+                }
+            }
+
             ForEach(sections, id: \.title) { section in
                 Section(section.title) {
-                    ForEach(section.items) { item in
-                        if let workout = item.workout {
-                            NavigationLink(value: workout) {
-                                WorkoutDayRow(day: workout)
-                            }
-                        } else {
-                            restDayRow(for: item.date)
+                    ForEach(section.items) { workout in
+                        NavigationLink(value: workout) {
+                            WorkoutDayRow(day: workout)
                         }
                     }
                 }
             }
         }
-    }
-
-    private func restDayRow(for date: Date) -> some View {
-        let isToday = Calendar.current.isDateInToday(date)
-        return HStack {
-            Label(
-                isToday ? "Today" : "Rest Day",
-                systemImage: isToday ? "sun.max" : "bed.double"
-            )
-            .foregroundStyle(isToday ? .primary : .secondary)
-            Spacer()
-            if isToday {
-                Text("Not logged yet")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Text(date.mediumDayLabel)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
-        .padding(.vertical, 4)
     }
 
     private var logMenu: some View {
@@ -129,18 +113,23 @@ struct PlanLogView: View {
         }
     }
 
-    // MARK: - Timeline
+    // MARK: - Sessions
 
     private struct LogSection {
         let title: String
-        let items: [PlanLogItem]
+        let items: [WorkoutDay]
+    }
+
+    /// Sessions stamped from one of this plan's days, newest first (`allDays` is already
+    /// sorted that way).
+    private var sessions: [WorkoutDay] {
+        allDays.filter { $0.planDay?.plan === viewModel.plan }
     }
 
     /// Month sections in newest-first order, built sequentially so ordering is preserved.
     private var sections: [LogSection] {
-        let items = PlanTimeline.items(for: viewModel.plan, workouts: allDays)
         var result: [LogSection] = []
-        for item in items {
+        for item in sessions {
             let title = item.date.formatted(.dateTime.month(.wide).year())
             if let last = result.indices.last, result[last].title == title {
                 result[last] = LogSection(title: title, items: result[last].items + [item])

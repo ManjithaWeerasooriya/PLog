@@ -17,6 +17,8 @@ struct PlanExerciseRow: View {
     /// see `PlanDayDetailView`.
     @Binding var isExpanded: Bool
 
+    @Environment(\.dynamicTypeSize) private var typeSize
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Button {
@@ -31,9 +33,10 @@ struct PlanExerciseRow: View {
             .accessibilityHint("Double-tap to edit target sets and reps")
 
             if isExpanded {
-                HStack(alignment: .top, spacing: 24) {
-                    NumberStepper(title: "Sets", intValue: $planExercise.targetSets, range: 1...20)
-                    NumberStepper(title: "Reps", intValue: $planExercise.targetReps, range: 1...100)
+                // Side by side while they fit; stacked at accessibility type sizes.
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: 24) { steppers }
+                    VStack(spacing: 16) { steppers }
                 }
                 .padding(.bottom, 4)
             }
@@ -41,27 +44,50 @@ struct PlanExerciseRow: View {
         .padding(.vertical, 4)
     }
 
+    @ViewBuilder
+    private var steppers: some View {
+        NumberStepper(title: "Sets", intValue: $planExercise.targetSets, range: 1...20)
+        NumberStepper(title: "Reps", intValue: $planExercise.targetReps, range: 1...100)
+    }
+
     private var header: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(planExercise.exercise?.name ?? "Exercise")
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-                if let category = planExercise.exercise?.category {
-                    CategoryChip(category: category)
+            // Stacked at accessibility sizes so the name doesn't wrap word by word.
+            if typeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 6) {
+                    nameAndChip
+                    targets
                 }
+                Spacer()
+            } else {
+                nameAndChip
+                Spacer()
+                targets
             }
-            Spacer()
-            Text("\(planExercise.targetSets) × \(planExercise.targetReps)")
-                .font(.subheadline.monospacedDigit())
-                .foregroundStyle(.secondary)
-                .contentTransition(.numericText())
             Image(systemName: "chevron.right")
                 .font(.caption.weight(.bold))
                 .foregroundStyle(.tertiary)
                 .rotationEffect(.degrees(isExpanded ? 90 : 0))
         }
         .contentShape(Rectangle())
+    }
+
+    private var nameAndChip: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(planExercise.exercise?.name ?? "Exercise")
+                .font(.headline)
+                .foregroundStyle(.primary)
+            if let category = planExercise.exercise?.category {
+                CategoryChip(category: category)
+            }
+        }
+    }
+
+    private var targets: some View {
+        Text("\(planExercise.targetSets) × \(planExercise.targetReps)")
+            .font(.subheadline.monospacedDigit())
+            .foregroundStyle(.secondary)
+            .contentTransition(.numericText())
     }
 }
 

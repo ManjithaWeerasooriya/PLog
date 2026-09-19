@@ -48,6 +48,16 @@ enum ProgressTrend {
         case .none: return nil
         }
     }
+
+    /// What VoiceOver reads for the badge, which is otherwise just a coloured arrow.
+    var accessibilityLabel: String {
+        switch self {
+        case .improved: return "Improved"
+        case .regressed: return "Regressed"
+        case .matched: return "Same as last time"
+        case .none: return ""
+        }
+    }
 }
 
 enum ProgressiveOverload {

@@ -29,17 +29,15 @@ struct PlanDetailView: View {
                     .font(.headline)
                 TextField("Notes", text: $plan.notes, axis: .vertical)
                     .lineLimit(1...4)
-                statusRow
             }
 
             Section {
                 lifecycleButton
-            }
-
-            Section {
                 NavigationLink(value: PlanRoute.log(viewModel.plan)) {
                     Label("Workout Log", systemImage: "calendar.day.timeline.left")
                 }
+            } footer: {
+                Text(statusLine)
             }
 
             daysSection
@@ -72,25 +70,17 @@ struct PlanDetailView: View {
 
     // MARK: - Sections
 
-    private var statusRow: some View {
-        HStack {
-            Text("Status")
-            Spacer()
-            PlanStatusPill(status: viewModel.plan.status)
-            if let dates = dateRangeLabel {
-                Text(dates)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+    /// e.g. "Active since Sep 16" / "Ran Sep 1 – Sep 16" / "Not started".
+    private var statusLine: String {
+        switch viewModel.plan.status {
+        case .notStarted:
+            return "Not started"
+        case .active:
+            return viewModel.plan.startedAt.map { "Active since \($0.shortDateLabel)" } ?? "Active"
+        case .ended:
+            guard let start = viewModel.plan.startedAt, let end = viewModel.plan.endedAt else { return "Ended" }
+            return "Ran \(start.shortDateLabel) – \(end.shortDateLabel)"
         }
-    }
-
-    private var dateRangeLabel: String? {
-        guard let start = viewModel.plan.startedAt else { return nil }
-        if let end = viewModel.plan.endedAt {
-            return "\(start.shortDateLabel) – \(end.shortDateLabel)"
-        }
-        return "since \(start.shortDateLabel)"
     }
 
     @ViewBuilder

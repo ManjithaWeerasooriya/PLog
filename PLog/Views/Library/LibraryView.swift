@@ -72,7 +72,6 @@ struct LibraryView: View {
             }
         }
         .pickerStyle(.segmented)
-        .frame(width: 220)
     }
 }
 

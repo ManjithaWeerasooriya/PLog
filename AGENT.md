@@ -53,7 +53,7 @@ PLog/                        ← repo root
     │   │   └── TrendBadge.swift     ← green/red/gray capsule pill; CategoryChip
     │   ├── Home/
     │   │   ├── HomeView.swift       ← Logs tab: sessions by month; "+" picks a plan day
-    │   │   └── WorkoutDayRow.swift  ← one row: name, date, plan tag, exercise summary
+    │   │   └── WorkoutDayRow.swift  ← one row: name + date, exercise summary (two lines)
     │   ├── Calendar/
     │   │   └── CalendarView.swift   ← Calendar tab: month grid, workout vs rest days, day detail
     │   ├── Analytics/
@@ -86,7 +86,6 @@ PLog/                        ← repo root
         ├── ProgressiveOverload.swift ← SetSnapshot, ProgressTrend, overload logic
         ├── WorkoutHistory.swift      ← read-only helpers: previousEntry, historyPoints
         ├── WorkoutLogger.swift       ← stamps a PlanDay into a WorkoutDay; suggestedNextDay
-        ├── PlanTimeline.swift        ← builds PlanLogItem rows (sessions + rest days)
         ├── WorkoutCalendar.swift     ← month grid cells + trained/rest/pending/inactive status
         ├── WorkoutStats.swift        ← analytics aggregations: volume, weekly, split, streak, best lifts
         ├── StarterData.swift         ← first-launch seed: exercise library + 2 sample plans
@@ -138,6 +137,8 @@ Setting only the to-one side (`slot.planDay = day`, or passing it to the `init`)
 ### Gender is a plain two-case enum
 
 `Gender` has exactly two cases, `.female` and `.male` — no "prefer not to say"/non-binary option; that was tried and deliberately walked back. `UserProfile`'s default is `.female`. If a third option is ever wanted, add the case back to `Gender.swift` and give `UserProfile.init` a real default again; don't special-case a `nil`/optional `Gender` for it.
+
+**`name`, `gender`, `age` and `heightCm` are persisted but not surfaced.** Settings only edits `weightKg` — the one field a feature reads (Analytics' body-weight card). The other fields stay on the model and in `DataBackup` so existing backups round-trip unchanged; they were removed from the Settings form because asking for data nothing displays is clutter. Put them back in the UI only alongside a feature that consumes them.
 
 ### MuscleGroup categories
 
@@ -196,11 +197,11 @@ The segmented Plans | Exercises picker is a `@State` in `LibraryView`, rendered 
 
 `WorkoutLogger.logWorkout(for:on:in:)` stamps a `PlanDay` template into a `WorkoutDay`: one `ExerciseEntry` per slot with `targetSets` sets at `targetReps`, weight prefilled from `WorkoutHistory.previousTopSet` — so logging a plan day means only adjusting weights. It's called from two places that must stay in sync: the **Logs tab** (`HomeView`'s "+" is a `Menu` of the active plan's days, with `WorkoutLogger.suggestedNextDay` flagged "Up next", plus "Blank Workout"; it's a plain button when no plan is active) and the plan's own log screen via `WorkoutPlanViewModel`. `DayDetailView` shows a "Plan Day" row for stamped sessions.
 
-`PlanTimeline.items(for:workouts:)` produces the plan log rows: every calendar day from `startedAt` to `endedAt ?? today`; days with no session are rest days (today is shown as "Not logged yet" instead).
+`PlanLogView` lists only the sessions stamped from the plan's days (`allDays.filter { $0.planDay?.plan === plan }`), newest first by month, plus the "Up Next" row. It used to pad the list with a row for every rest day in the plan's window (`PlanTimeline`, since deleted) — a 12-week plan rendered ~60 "Rest Day" rows around a handful of sessions. The Calendar tab is where rest days are shown.
 
 ### Calendar & Analytics are read-only over `@Query`
 
-Both tabs follow the list/read-screen pattern: `@Query` in the view, all math in pure helpers. `WorkoutCalendar.monthCells(for:workouts:historyStart:)` classifies every date as `.trained(sessions:)`, `.rest`, `.pending` (today, nothing logged) or `.inactive` (future, or before `historyStart`). **A rest day is only a past date on/after `historyStart`** — the earliest session or earliest `plan.startedAt` — so a fresh install isn't a wall of "rest days". `PlanTimeline` uses the same "no session = rest day" rule inside a plan's window; keep the two in agreement. The Analytics activity grid reuses these cells (`WorkoutCalendar.weeks` chunks them into 7-wide columns), so the two tabs can't disagree about which days count.
+Both tabs follow the list/read-screen pattern: `@Query` in the view, all math in pure helpers. `WorkoutCalendar.monthCells(for:workouts:historyStart:)` classifies every date as `.trained(sessions:)`, `.rest`, `.pending` (today, nothing logged) or `.inactive` (future, or before `historyStart`). **A rest day is only a past date on/after `historyStart`** — the earliest session or earliest `plan.startedAt` — so a fresh install isn't a wall of "rest days". The Analytics activity grid reuses these cells (`WorkoutCalendar.weeks` chunks them into 7-wide columns), so the two tabs can't disagree about which days count.
 
 `WorkoutStats` (weekly summaries, daily volumes, muscle split, week streak, best lifts) always returns fixed-width series that include empty periods as zeros, so bar charts keep a stable width. Weeks are bucketed by `Calendar.dateInterval(of: .weekOfYear)` start, honoring the device's first weekday. The "Best lifts" trend reuses `ProgressiveOverload.trend` on the last two sessions' top sets — don't compare raw weights there either. Volume totals display via `WeightFormatter.volumeString` (grouped, no decimals); individual weights still use `WeightFormatter.string`.
 
@@ -265,11 +266,9 @@ SetSnapshot(weight: 60, reps: 8).estimatedOneRepMax  ≈ 76
 
 A tolerance of `0.01` is applied to avoid floating-point noise registering as a change.
 
-**Prefill flow:**
-1. `ExerciseEntryViewModel.init` calls `WorkoutHistory.previousTopSet(for:excluding:)`
-2. `previousTopSet` is stored as `SetSnapshot?` (model-free; safe to pass around UI)
-3. `prefillIfNeeded()` inserts the first `SetEntry` with those numbers if the entry is new
-4. `addDuplicateSet()` clones the last set's numbers for quick multi-set entry
+**Which previous set a set is compared to — set *n* vs. set *n*.** `ExerciseEntryViewModel.trend(for:)` grades a set against the **same-numbered** set from the previous session (`WorkoutHistory.previousSets(for:excluding:)`, in performed order), falling back to the previous session's top set only for a set number the previous session didn't have. It used to compare every set to the top set, which painted a deliberate back-off third set red and taught users to ignore red — the whole signal loses credibility if it's wrong about normal training. Session-level questions still use the top set: `ExerciseHistoryView`'s overall trend and `WorkoutStats.bestLifts` compare sessions' best sets, and the "Last time" hint shows `previousTopSet`.
+
+**Prefill follows the same rule.** `WorkoutLogger.logWorkout` gives set *n* the weight of last session's set *n* (top-set weight if there was no set *n*, `0` with no history); reps come from the plan's `targetReps`. `ExerciseEntryViewModel.addSet()` seeds the next set from last session's same-numbered set when there was one, otherwise duplicates the last set. `ExerciseEntryViewModel.prefill(_:in:)` (a brand-new entry's first set, called once from `DayDetailView.addExercise`) uses the top set — set 1 usually *is* the top set. `previousTopSet`/`previousSets` are `SetSnapshot`s (model-free; safe to pass around the UI).
 
 ---
 
@@ -307,6 +306,14 @@ When adding a new screen, always wire up a `#Preview` using `SampleData.containe
 - **Comments:** only when the WHY is non-obvious (e.g. the nullify vs cascade decision). No docstrings on obvious getters
 - **No Combine** — use `async/await` and `@Observable` instead
 - **No force unwrap** in production code; sample data accessors may use `!` only where the data is known-seeded
+
+### Accessibility: colour on the icon and fill, never on small text
+
+Every tinted pill — `TrendBadge`, `CategoryChip`, `PlanStatusPill` — puts the semantic colour on its SF Symbol (or a leading dot) and on the capsule fill (`color.opacity(0.15)`); the **text is always `.primary`**. System green/red/orange/yellow/mint/cyan as *text* on a light background are 1.5–3.5:1, all under the 4.5:1 AA floor, and `.caption`-sized text is exactly where that bites. Label colour on any grouped background is ≥ 15:1, and system colours pick up their high-contrast variants under Increase Contrast on their own. `MuscleGroup.core` is `.brown` rather than `.yellow` because yellow fails even as a fill/icon on a light card. Don't add a new coloured-text pill; don't use `.caption2` for anything (the smallest text style in the app is `.caption`).
+
+**Dynamic Type.** No fixed point sizes or widths on anything that holds text: `BigStat` takes a `Font.TextStyle`, not a number; segmented pickers size to their labels (the Library and Analytics range pickers had hard-coded widths that clipped); dimensions that should grow with text use `@ScaledMetric` (calendar day circles, rings, legend dots, stepper buttons). Layouts that put two things side by side use `ViewThatFits(in: .horizontal) { HStack {…}; VStack {…} }` (Analytics card pairs and card headers, the two hero steppers in `SetRow`/`PlanExerciseRow`, the muscle-split donut + legend), or switch on `dynamicTypeSize.isAccessibilitySize` when the two arrangements aren't the same children (`WorkoutDayRow`, the `ExerciseEntryRows`/`SetRow`/`PlanExerciseRow` headers). Two deliberate exceptions: the activity dot grid and the muscle-split donut are charts, not text, and keep fixed sizes so three months of weeks still fit across the card; and every Swift `Chart` is capped at `.dynamicTypeSize(...DynamicTypeSize.xxxLarge)` because axis labels collide above that — the same approach Health takes. Verify at `accessibility-extra-extra-extra-large` (`xcrun simctl ui <udid> content_size …`); anything that wraps word-per-word or pushes the page wider than the screen (a vertical `ScrollView` silently centres over-wide content, which shows up as the *nav title* being cut off) needs one of the treatments above.
+
+VoiceOver labelling beyond `TrendBadge`/`CategoryChip`/`PlanStatusPill`/`NumberStepper` is still to do.
 
 ### WeightFormatter
 

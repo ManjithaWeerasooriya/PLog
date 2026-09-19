@@ -44,16 +44,17 @@ struct AnalyticsCardTitle: View {
     }
 }
 
-/// A big number with a small trailing unit, e.g. "190 kg".
+/// A big number with a small trailing unit, e.g. "190 kg". Sized by text style, not points,
+/// so it follows Dynamic Type like everything else.
 struct BigStat: View {
     let value: String
     var unit: String? = nil
-    var size: CGFloat = 40
+    var style: Font.TextStyle = .largeTitle
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 4) {
             Text(value)
-                .font(.system(size: size, weight: .bold, design: .rounded))
+                .font(.system(style, design: .rounded, weight: .bold))
                 .monospacedDigit()
                 .minimumScaleFactor(0.6)
                 .lineLimit(1)

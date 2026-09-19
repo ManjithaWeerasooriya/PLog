@@ -50,6 +50,16 @@ enum WorkoutHistory {
         return SetSnapshot(weight: top.weight, reps: top.reps)
     }
 
+    /// The previous session's sets in performed order, for set-by-set comparison and prefill
+    /// (set *n* this time vs. set *n* last time). Empty when there's no previous session.
+    static func previousSets(
+        for exercise: Exercise,
+        excluding current: ExerciseEntry? = nil
+    ) -> [SetSnapshot] {
+        guard let entry = previousEntry(for: exercise, excluding: current) else { return [] }
+        return entry.orderedSets.map { SetSnapshot(weight: $0.weight, reps: $0.reps) }
+    }
+
     /// Chronological progress points for charting, oldest → newest.
     static func historyPoints(for exercise: Exercise) -> [ExerciseHistoryPoint] {
         exercise.entries

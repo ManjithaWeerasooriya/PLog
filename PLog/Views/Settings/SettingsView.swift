@@ -2,7 +2,7 @@
 //  SettingsView.swift
 //  PLog
 //
-//  The Settings tab: appearance, the user's own details, and data export/import.
+//  The Settings tab: appearance, body weight, and data export/import.
 //  `UserProfile.ensureExists` guarantees a row already exists by the time this view appears,
 //  so `profiles.first` is safe to treat as non-optional here (the one place in the app where
 //  that's true by construction).
@@ -57,30 +57,10 @@ private struct SettingsForm: View {
                 .pickerStyle(.navigationLink)
             }
 
-            Section("About You") {
-                TextField("Name", text: $profile.name)
-                    .textInputAutocapitalization(.words)
-
-                Picker("Gender", selection: $profile.gender) {
-                    ForEach(Gender.allCases) { gender in
-                        Text(gender.displayName).tag(gender)
-                    }
-                }
-                .pickerStyle(.navigationLink)
-            }
-
+            // Only the field a feature actually reads (Analytics' body-weight card). Name,
+            // gender, age and height are still persisted on `UserProfile` for backups, but
+            // nothing displays them, so they aren't asked for.
             Section("Body") {
-                NumberStepper(title: "Age", intValue: ageBinding, range: 10...100, unit: "yrs", style: .row)
-                NumberStepper(
-                    title: "Height",
-                    value: heightBinding,
-                    step: 1,
-                    range: 100...250,
-                    unit: "cm",
-                    style: .row,
-                    format: { String(Int($0)) },
-                    keyboard: .numberPad
-                )
                 NumberStepper(title: "Weight", value: weightBinding, step: 0.5, range: 30...300, unit: "kg", style: .row)
             }
 
@@ -91,20 +71,10 @@ private struct SettingsForm: View {
 
     // MARK: - Optional <-> stepper bindings
 
-    /// Seeds sensible starting values the first time Settings is opened, so the steppers never
-    /// silently disagree with the (still-nil) model — see `UserProfile.age`'s doc comment.
+    /// Seeds a sensible starting value the first time Settings is opened, so the stepper never
+    /// silently disagrees with the (still-nil) model — see `UserProfile.weightKg`'s doc comment.
     private func seedDefaultsIfNeeded() {
-        if profile.age == nil { profile.age = 25 }
-        if profile.heightCm == nil { profile.heightCm = 170 }
         if profile.weightKg == nil { profile.weightKg = 70 }
-    }
-
-    private var ageBinding: Binding<Int> {
-        Binding(get: { profile.age ?? 25 }, set: { profile.age = $0 })
-    }
-
-    private var heightBinding: Binding<Double> {
-        Binding(get: { profile.heightCm ?? 170 }, set: { profile.heightCm = $0 })
     }
 
     private var weightBinding: Binding<Double> {

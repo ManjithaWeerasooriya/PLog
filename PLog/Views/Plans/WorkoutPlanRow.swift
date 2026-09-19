@@ -52,17 +52,29 @@ struct WorkoutPlanRow: View {
     }
 }
 
-/// A tinted capsule showing a plan's lifecycle state.
+/// A tinted capsule showing a plan's lifecycle state. Colour on the dot and fill, text
+/// label-coloured — same rule as `TrendBadge`/`CategoryChip`.
 struct PlanStatusPill: View {
     let status: PlanStatus
 
+    @ScaledMetric(relativeTo: .caption) private var dotSize = 6
+
     var body: some View {
-        Text(status.displayName)
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(status.color)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(status.color.opacity(0.15), in: Capsule())
+        HStack(spacing: 5) {
+            Circle()
+                .fill(status.color)
+                .frame(width: dotSize, height: dotSize)
+            Text(status.displayName)
+                .foregroundStyle(.primary)
+        }
+        .lineLimit(1)
+        .fixedSize()
+        .font(.caption.weight(.semibold))
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(status.color.opacity(0.15), in: Capsule())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(status.displayName)
     }
 }
 

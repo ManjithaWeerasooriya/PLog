@@ -19,6 +19,8 @@ struct ActivityMonth: Identifiable {
 struct ActivityDotGrid: View {
     let months: [ActivityMonth]
 
+    // Deliberately not scaled with Dynamic Type: three months of weeks have to fit across
+    // the card at every size, and the dots are a chart, not text.
     private let dotSize: CGFloat = 7
     private let spacing: CGFloat = 5
 
