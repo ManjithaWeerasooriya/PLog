@@ -36,6 +36,14 @@ extension Date {
     }
 }
 
+extension WeightFormatter {
+    /// Formats a summed volume with thousands grouping and no decimals ("3,200", not
+    /// "3200.0") — for totals, where a half-kilo is noise.
+    static func volumeString(_ value: Double) -> String {
+        Int(value.rounded()).formatted(.number.grouping(.automatic))
+    }
+}
+
 extension Date {
     /// e.g. "September 2026"
     var monthYearLabel: String {

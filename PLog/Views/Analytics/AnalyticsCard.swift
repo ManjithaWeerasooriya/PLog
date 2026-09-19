@@ -1,0 +1,120 @@
+//
+//  AnalyticsCard.swift
+//  PLog
+//
+//  The rounded tile every Analytics widget sits in, plus the small title/subtitle header
+//  most of them share. Kept as one component so the dashboard reads as a single grid.
+//
+
+import SwiftUI
+
+struct AnalyticsCard<Content: View>: View {
+    private let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        content
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                Color(uiColor: .secondarySystemGroupedBackground),
+                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+            )
+    }
+}
+
+/// "Volume lifted / Last 7 days" style header used at the top of a card.
+struct AnalyticsCardTitle: View {
+    let title: String
+    var subtitle: String? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.headline)
+            if let subtitle {
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+/// A big number with a small trailing unit, e.g. "190 kg".
+struct BigStat: View {
+    let value: String
+    var unit: String? = nil
+    var size: CGFloat = 40
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            Text(value)
+                .font(.system(size: size, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .minimumScaleFactor(0.6)
+                .lineLimit(1)
+            if let unit {
+                Text(unit)
+                    .font(.title3.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+/// A ring that fills clockwise from the top, with arbitrary content in the middle.
+struct ProgressRing<Content: View>: View {
+    let progress: Double
+    var lineWidth: CGFloat = 6
+    private let content: Content
+
+    init(progress: Double, lineWidth: CGFloat = 6, @ViewBuilder content: () -> Content) {
+        self.progress = progress
+        self.lineWidth = lineWidth
+        self.content = content()
+    }
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.primary.opacity(0.1), lineWidth: lineWidth)
+            Circle()
+                .trim(from: 0, to: min(max(progress, 0), 1))
+                .stroke(Color.accentColor, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .animation(.snappy, value: progress)
+            content
+        }
+    }
+}
+
+#Preview {
+    ScrollView {
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
+                AnalyticsCard {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ProgressRing(progress: 0.66) {
+                            Text("2").font(.title2.bold())
+                        }
+                        .frame(width: 64, height: 64)
+                        AnalyticsCardTitle(title: "Push / Pull / Legs", subtitle: "Next: Leg Day")
+                    }
+                }
+                AnalyticsCard {
+                    VStack(alignment: .leading, spacing: 12) {
+                        BigStat(value: "70", unit: "kg")
+                        AnalyticsCardTitle(title: "Body weight", subtitle: "From your profile")
+                    }
+                }
+            }
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding()
+    }
+    .background(Color(uiColor: .systemGroupedBackground))
+}
