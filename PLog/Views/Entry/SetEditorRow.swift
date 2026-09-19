@@ -17,6 +17,22 @@ struct SetEditorRow: View {
     /// see `AddEditExerciseEntryView`.
     @Binding var isExpanded: Bool
 
+    /// Local text buffer for the weight field, seeded once from the model in `init` (not
+    /// re-synced from `set.weight` afterwards). Re-deriving the displayed text from the model
+    /// on every keystroke would reformat mid-entry (e.g. `WeightFormatter` drops a trailing
+    /// "." the instant it's typed), making it impossible to type a decimal like "62.5". Since
+    /// this field is the only writer of `set.weight` while this row is alive, one-way seeding
+    /// is safe — see the `AddExerciseView` "seed from init" note in AGENT.md.
+    @State private var weightText: String
+    @FocusState private var weightFieldFocused: Bool
+
+    init(set: SetEntry, trend: ProgressTrend, isExpanded: Binding<Bool>) {
+        self._set = Bindable(wrappedValue: set)
+        self.trend = trend
+        self._isExpanded = isExpanded
+        self._weightText = State(initialValue: WeightFormatter.string(set.weight))
+    }
+
     var body: some View {
         VStack(spacing: 8) {
             header
@@ -27,14 +43,7 @@ struct SetEditorRow: View {
 
             if isExpanded {
                 HStack(spacing: 20) {
-                    NumberPickerWheel(
-                        title: "Weight",
-                        value: $set.weight,
-                        step: 2.5,
-                        range: 0...500,
-                        unit: "kg",
-                        width: 120
-                    )
+                    weightField
                     NumberPickerWheel(
                         title: "Reps",
                         intValue: $set.reps,
@@ -45,6 +54,39 @@ struct SetEditorRow: View {
             }
         }
         .padding(.vertical, 4)
+    }
+
+    private var weightField: some View {
+        VStack(spacing: 2) {
+            Text("Weight")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            HStack(spacing: 4) {
+                TextField("0", text: $weightText)
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .font(.body.monospacedDigit())
+                    .focused($weightFieldFocused)
+                    .onChange(of: weightText) { _, newValue in
+                        if let parsed = Double(newValue.replacingOccurrences(of: ",", with: ".")), parsed >= 0 {
+                            set.weight = parsed
+                        }
+                    }
+                    .toolbar {
+                        ToolbarItemGroup(placement: .keyboard) {
+                            Spacer()
+                            Button("Done") { weightFieldFocused = false }
+                        }
+                    }
+                Text("kg")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+        }
+        .frame(width: 120)
     }
 
     private var header: some View {
