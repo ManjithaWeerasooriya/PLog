@@ -82,7 +82,8 @@ PLog/                        ← repo root
     │   │   ├── ExerciseLibraryView.swift ← Exercises section: searchable list by category
     │   │   └── AddExerciseView.swift     ← create OR edit (exercise: Exercise? param)
     │   └── Settings/
-    │       └── SettingsView.swift    ← Settings tab: UserProfile form (name/gender/age/etc.)
+    │       ├── SettingsView.swift        ← Settings tab: theme, UserProfile form, Data section
+    │       └── DataTransferSection.swift ← Export/Import buttons, file pickers, confirm alerts
     └── Utilities/
         ├── ProgressiveOverload.swift ← SetSnapshot, ProgressTrend, overload logic
         ├── WorkoutHistory.swift      ← read-only helpers: previousEntry, historyPoints
@@ -91,6 +92,7 @@ PLog/                        ← repo root
         ├── WorkoutCalendar.swift     ← month grid cells + trained/rest/pending/inactive status
         ├── WorkoutStats.swift        ← analytics aggregations: volume, weekly, split, streak, best lifts
         ├── StarterData.swift         ← first-launch seed: exercise library + 2 sample plans
+        ├── DataBackup.swift          ← JSON backup format (PLogBackup) + export/decode/restore
         ├── AppTheme.swift            ← system/light/dark @AppStorage preference
         ├── Formatters.swift          ← WeightFormatter, Date extensions
         └── SampleData.swift          ← in-memory ModelContainer for SwiftUI previews
@@ -234,9 +236,17 @@ Every screen that live-binds `@Model` properties (so edits apply the instant the
 
 **Deliberately excluded**: `SettingsView` (a root tab, not a pushed/sheeted editor — there's no "back" gesture to guard, and live-applying preferences instantly matches how Settings apps conventionally behave) and the explicit destructive buttons ("Remove Exercise from Day", swipe-to-delete elsewhere) — those are already unambiguous, already-confirmed (or single-purpose) actions, not the "silently saved by navigating away" failure mode this fix targets.
 
+### Data export / import is a JSON snapshot, not the SwiftData store
+
+`DataBackup` (`Utilities/DataBackup.swift`) serialises the whole object graph to one `PLogBackup` JSON document (ISO-8601 dates, pretty-printed) and restores it. Cross-references (`PlanExercise.exercise`, `ExerciseEntry.exercise`, `WorkoutDay.planDay`) are written as **export-time UUIDs** — `PersistentIdentifier` is not stable across stores, so it never appears in the file. `PLogBackup.currentVersion` is stamped into every file; `decode` refuses a newer version with a clear message. **Bump the version and add a migration branch in `decode` when a record's shape changes** — don't silently add required fields.
+
+**Import is replace-all, never merge.** `restore` deletes sessions → plans → exercises (in that order so cascade/nullify rules never leave dangling links), then re-inserts everything appending from the to-many side per the relationship rule above. The `UserProfile` row is updated in place so the singleton guarantee holds. `DataTransferSection` (Settings → Data) parses the picked file first and shows counts in a "Replace All Data?" `.alert` before anything is touched. Enum raw values that no longer decode (`MuscleGroup`, `Gender`) fall back to `.other`/`.female` rather than failing the import.
+
+The file picker URL is security-scoped — reads must be wrapped in `startAccessingSecurityScopedResource()`. `BackupDocument` (the `FileDocument` for `.fileExporter`) is declared `nonisolated` because the project's default `MainActor` isolation otherwise conflicts with the protocol's nonisolated requirements; do the same for any future `FileDocument`/`Transferable` type.
+
 ### Destructive actions confirm first — use `.alert`, not `.confirmationDialog`
 
-Deleting a `WorkoutPlan` (`PlanListView`), ending a plan (`PlanDetailView`), or deleting an `Exercise` (`ExerciseLibraryView`) stages the target in `@State` and shows a confirmation before calling `context.delete`/mutating. Stage-then-confirm, not delete-then-undo, for any new destructive action.
+Deleting a `WorkoutPlan` (`PlanListView`), ending a plan (`PlanDetailView`), deleting an `Exercise` (`ExerciseLibraryView`), or importing a backup (`DataTransferSection`) stages the target in `@State` and shows a confirmation before calling `context.delete`/mutating. Stage-then-confirm, not delete-then-undo, for any new destructive action.
 
 **Use `.alert`, never `.confirmationDialog`, for these.** On the iOS version this app has been tested against, `.confirmationDialog` does not reliably render as the standard bottom action sheet — it can instead render as a small anchored callout that latches onto an arbitrary ancestor view (e.g. the top of a `List`) instead of the row that triggered it, pointing at the wrong item, and it can drop its `Cancel` button entirely. `.presentationCompactAdaptation(.sheet)` does **not** fix this. `.alert` sidesteps the whole problem — it's always a centered, unanchored modal, so there's no anchor to get wrong. This was root-caused and fixed for the plan-delete, plan-end, and exercise-delete confirmations; don't reintroduce `.confirmationDialog` for a destructive action without re-verifying on-device first.
 

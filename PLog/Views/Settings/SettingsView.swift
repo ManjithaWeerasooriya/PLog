@@ -2,9 +2,10 @@
 //  SettingsView.swift
 //  PLog
 //
-//  The Settings tab: the user's own details. `UserProfile.ensureExists` guarantees a row
-//  already exists by the time this view appears, so `profiles.first` is safe to force-unwrap
-//  here (the one place in the app where that's true by construction).
+//  The Settings tab: appearance, the user's own details, and data export/import.
+//  `UserProfile.ensureExists` guarantees a row already exists by the time this view appears,
+//  so `profiles.first` is safe to treat as non-optional here (the one place in the app where
+//  that's true by construction).
 //
 
 import SwiftUI
@@ -98,6 +99,8 @@ private struct SettingsForm: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 4)
             }
+
+            DataTransferSection()
         }
         .onAppear(perform: seedDefaultsIfNeeded)
     }
