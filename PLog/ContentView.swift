@@ -2,8 +2,9 @@
 //  ContentView.swift
 //  PLog
 //
-//  Root tab bar: session logs, the training calendar, analytics, the library (plans and
-//  exercises behind a sub-nav), and settings.
+//  Root tab bar: Train (today's workout + the session log), Progress (analytics, with the
+//  calendar pushed from it) and the Library (plans and exercises behind a sub-nav). Settings
+//  is a sheet behind Train's profile button.
 //
 
 import SwiftUI
@@ -12,29 +13,19 @@ import SwiftData
 struct ContentView: View {
     var body: some View {
         TabView {
-            HomeView()
+            TrainView()
                 .tabItem {
-                    Label("Logs", systemImage: "list.bullet.rectangle")
-                }
-
-            CalendarView()
-                .tabItem {
-                    Label("Calendar", systemImage: "calendar")
+                    Label("Train", systemImage: "figure.strengthtraining.traditional")
                 }
 
             AnalyticsView()
                 .tabItem {
-                    Label("Analytics", systemImage: "chart.bar.xaxis")
+                    Label("Progress", systemImage: "chart.line.uptrend.xyaxis")
                 }
 
             LibraryView()
                 .tabItem {
                     Label("Library", systemImage: "square.grid.2x2")
-                }
-
-            SettingsView()
-                .tabItem {
-                    Label("Settings", systemImage: "gearshape")
                 }
         }
     }

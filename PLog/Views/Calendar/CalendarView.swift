@@ -2,8 +2,10 @@
 //  CalendarView.swift
 //  PLog
 //
-//  The Calendar tab: one month at a time, with training days filled in and rest days marked.
-//  Tapping a date lists the sessions logged that day (or says it was a rest day).
+//  The month calendar, pushed from the Progress tab's activity card: one month at a time
+//  with training days filled in. Tapping a date lists the sessions logged that day (or says
+//  it was a rest day). Plain stack content — the owning `NavigationStack` (and the
+//  `WorkoutDay` destination its rows push) lives in `AnalyticsView`.
 //
 
 import SwiftUI
@@ -13,7 +15,6 @@ struct CalendarView: View {
     @Query(sort: \WorkoutDay.date, order: .reverse) private var workouts: [WorkoutDay]
     @Query private var plans: [WorkoutPlan]
 
-    @State private var path: [WorkoutDay] = []
     @State private var displayedMonth = WorkoutCalendar.startOfMonth(.now)
     @State private var selectedDate = Calendar.current.startOfDay(for: .now)
 
@@ -21,32 +22,26 @@ struct CalendarView: View {
 
     // Scaled with the type size so the day circles and dots keep pace with their numbers.
     @ScaledMetric(relativeTo: .callout) private var cellSize = 34
-    @ScaledMetric(relativeTo: .callout) private var statusDotSize = 6
-    @ScaledMetric(relativeTo: .caption) private var legendDot = 10
+    @ScaledMetric(relativeTo: .callout) private var statusDotSize = 5
 
     var body: some View {
-        NavigationStack(path: $path) {
-            List {
-                Section {
-                    monthHeader
-                    monthGrid
-                    legend
-                }
-                .listRowSeparator(.hidden)
+        List {
+            Section {
+                monthHeader
+                monthGrid
+            }
+            .listRowSeparator(.hidden)
 
-                Section(selectedDayTitle) {
-                    selectedDayContent
-                }
+            Section(selectedDayTitle) {
+                selectedDayContent
             }
-            .navigationTitle("Calendar")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Today", action: jumpToToday)
-                        .disabled(isShowingCurrentMonth && calendar.isDateInToday(selectedDate))
-                }
-            }
-            .navigationDestination(for: WorkoutDay.self) { day in
-                DayDetailView(day: day)
+        }
+        .navigationTitle("Calendar")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button("Today", action: jumpToToday)
+                    .disabled(isShowingCurrentMonth && calendar.isDateInToday(selectedDate))
             }
         }
     }
@@ -103,6 +98,10 @@ struct CalendarView: View {
         .padding(.vertical, 4)
     }
 
+    /// iOS Calendar's language: a trained day is a filled accent circle, today is an accent
+    /// number, the selected day is a filled label-coloured circle with an inverted number
+    /// (plus a small accent dot beneath when it was also trained). Rest days get nothing —
+    /// absence is the marker, so the grid reads at a glance.
     private func dayCell(_ cell: CalendarDayCell) -> some View {
         let isSelected = cell.date == selectedDate
         let isTrained: Bool = {
@@ -115,26 +114,20 @@ struct CalendarView: View {
         } label: {
             VStack(spacing: 3) {
                 Text("\(cell.dayNumber)")
-                    .font(.callout.weight(cell.isToday ? .bold : .regular))
+                    .font(.callout.weight(cell.isToday || isSelected || isTrained ? .semibold : .regular))
                     .monospacedDigit()
-                    .foregroundStyle(numberColor(for: cell))
+                    .foregroundStyle(numberColor(for: cell, isSelected: isSelected, isTrained: isTrained))
                     .frame(width: cellSize, height: cellSize)
                     .background {
-                        if isTrained {
-                            Circle().fill(Color.accentColor)
-                        } else if isSelected {
-                            Circle().fill(Color.primary.opacity(0.1))
-                        }
-                    }
-                    .overlay {
                         if isSelected {
-                            Circle().strokeBorder(Color.primary.opacity(0.7), lineWidth: 2)
-                        } else if cell.isToday {
-                            Circle().strokeBorder(Color.accentColor, lineWidth: 1.5)
+                            Circle().fill(Color.primary)
+                        } else if isTrained {
+                            Circle().fill(Color.accentColor)
                         }
                     }
 
-                statusDot(for: cell.status)
+                Circle()
+                    .fill(isSelected && isTrained ? Color.accentColor : Color.clear)
                     .frame(width: statusDotSize, height: statusDotSize)
             }
             .frame(maxWidth: .infinity, minHeight: max(44, cellSize + 10))
@@ -142,45 +135,16 @@ struct CalendarView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel(for: cell))
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 
-    @ViewBuilder
-    private func statusDot(for status: WorkoutDayStatus) -> some View {
-        switch status {
-        case .rest:
-            Circle().strokeBorder(Color.secondary, lineWidth: 1)
-        case .pending:
-            Circle().fill(Color.secondary.opacity(0.4))
-        case .trained, .inactive:
-            Color.clear
-        }
-    }
-
-    private func numberColor(for cell: CalendarDayCell) -> Color {
+    private func numberColor(for cell: CalendarDayCell, isSelected: Bool, isTrained: Bool) -> Color {
+        if isSelected { return Color(uiColor: .systemBackground) }
+        if isTrained { return .white }
         switch cell.status {
-        case .trained: return .white
         case .inactive: return Color(uiColor: .tertiaryLabel)
-        case .rest, .pending: return cell.isToday ? .accentColor : .primary
+        case .rest, .pending, .trained: return cell.isToday ? .accentColor : .primary
         }
-    }
-
-    private var legend: some View {
-        HStack(spacing: 16) {
-            Label {
-                Text("Workout")
-            } icon: {
-                Circle().fill(Color.accentColor).frame(width: legendDot, height: legendDot)
-            }
-            Label {
-                Text("Rest day")
-            } icon: {
-                Circle().strokeBorder(Color.secondary, lineWidth: 1).frame(width: legendDot, height: legendDot)
-            }
-            Spacer()
-        }
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .padding(.bottom, 4)
     }
 
     // MARK: - Selected day
@@ -281,6 +245,11 @@ struct CalendarView: View {
 }
 
 #Preview {
-    CalendarView()
-        .modelContainer(SampleData.container)
+    NavigationStack {
+        CalendarView()
+            .navigationDestination(for: WorkoutDay.self) { day in
+                DayDetailView(day: day)
+            }
+    }
+    .modelContainer(SampleData.container)
 }

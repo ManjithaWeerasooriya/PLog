@@ -2,9 +2,10 @@
 //  AnalyticsView.swift
 //  PLog
 //
-//  The Analytics tab: a card dashboard — active-plan progress, body weight, a three-month
-//  activity grid, volume lifted this week, then weekly trend charts, a muscle-group split,
-//  and the user's best lifts. Everything is derived from `@Query` results via `WorkoutStats`.
+//  The Progress tab (the type keeps its old name — `ProgressView` is SwiftUI's): a card
+//  dashboard — active-plan progress, body weight, a three-month activity grid that pushes the
+//  full calendar, volume lifted this week, then weekly trend charts, a muscle-group split, and
+//  the user's best lifts. Everything is derived from `@Query` results via `WorkoutStats`.
 //
 
 import SwiftUI
@@ -20,6 +21,11 @@ enum AnalyticsRange: Int, CaseIterable, Identifiable {
     var id: Int { rawValue }
     var weeks: Int { rawValue }
     var label: String { "\(rawValue)W" }
+}
+
+/// Non-model screens reachable from the Progress stack.
+enum ProgressRoute: Hashable {
+    case calendar
 }
 
 struct AnalyticsView: View {
@@ -48,9 +54,19 @@ struct AnalyticsView: View {
                     dashboard
                 }
             }
-            .navigationTitle("Analytics")
+            .navigationTitle("Progress")
             .navigationDestination(for: Exercise.self) { exercise in
                 ExerciseHistoryView(exercise: exercise)
+            }
+            .navigationDestination(for: ProgressRoute.self) { route in
+                switch route {
+                case .calendar:
+                    CalendarView()
+                }
+            }
+            // The calendar's session rows push through this stack.
+            .navigationDestination(for: WorkoutDay.self) { day in
+                DayDetailView(day: day)
             }
         }
     }
@@ -59,15 +75,16 @@ struct AnalyticsView: View {
 
     private var dashboard: some View {
         ScrollView {
-            VStack(spacing: 12) {
+            // 16-pt gaps between cards (8-pt grid); 12 inside them.
+            VStack(spacing: 16) {
                 // Side by side while they fit; stacked at accessibility type sizes.
                 ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 12) {
+                    HStack(spacing: 16) {
                         planCard
                         bodyWeightCard
                     }
                     .fixedSize(horizontal: false, vertical: true)
-                    VStack(spacing: 12) {
+                    VStack(spacing: 16) {
                         planCard
                         bodyWeightCard
                     }
@@ -158,22 +175,32 @@ struct AnalyticsView: View {
 
     // MARK: - Activity grid
 
+    /// Tappable: pushes the full month calendar.
     private var activityCard: some View {
-        AnalyticsCard {
-            VStack(alignment: .leading, spacing: 14) {
-                AnalyticsCardTitle(title: "Activity", subtitle: "Last 3 months")
-                ActivityDotGrid(months: activityMonths)
-                HStack(spacing: 14) {
-                    legendItem(color: .accentColor, text: "Workout")
-                    legendItem(color: Color.primary.opacity(0.18), text: "Rest day")
-                    Spacer()
-                    Text("\(recentWorkoutCount) workout\(recentWorkoutCount == 1 ? "" : "s")")
-                        .monospacedDigit()
+        NavigationLink(value: ProgressRoute.calendar) {
+            AnalyticsCard {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(alignment: .top) {
+                        AnalyticsCardTitle(title: "Activity", subtitle: "Last 3 months")
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                    ActivityDotGrid(months: activityMonths)
+                    HStack(spacing: 14) {
+                        legendItem(color: .accentColor, text: "Workout")
+                        legendItem(color: Color.primary.opacity(0.18), text: "Rest day")
+                        Spacer()
+                        Text("\(recentWorkoutCount) workout\(recentWorkoutCount == 1 ? "" : "s")")
+                            .monospacedDigit()
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
             }
         }
+        .buttonStyle(.plain)
     }
 
     private func legendItem(color: Color, text: String) -> some View {
@@ -222,11 +249,11 @@ struct AnalyticsView: View {
 
     private var totalsRow: some View {
         ViewThatFits(in: .horizontal) {
-            HStack(spacing: 12) {
+            HStack(spacing: 16) {
                 totalStats
             }
             .fixedSize(horizontal: false, vertical: true)
-            VStack(spacing: 12) {
+            VStack(spacing: 16) {
                 totalStats
             }
         }

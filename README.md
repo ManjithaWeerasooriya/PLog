@@ -4,13 +4,12 @@ An iOS workout tracker built for progressive overload. Log your sets per exercis
 
 ## Features
 
-- **Log workouts** — pick a day from your active plan and the session is created with every exercise and set pre-filled; you only update the weights. Or start from a blank workout
-- **Progressive overload at a glance** — every set is compared against your last session using estimated one-rep max (Epley formula), so trading weight for reps (or vice versa) is still recognized as progress
+- **Train** — the tab opens on today's action: start your plan's next day and the session is created with every exercise and set pre-filled from the same set last time; you only nudge the weights. Or start a blank workout. Sets are edited in place with a big ⊖ / ⊕ stepper (hold to repeat, tap the number to type)
+- **Progressive overload at a glance** — every set is compared against the same-numbered set from your last session using estimated one-rep max (Epley formula), so trading weight for reps (or vice versa) is still recognized as progress, and a planned back-off set isn't painted as a regression
 - **Exercise library** — a reusable master list of exercises, organized by muscle group, editable in place, with per-exercise history charts
 - **Workout plans** — build a rotation of day templates (Push, Pull, Legs, …), each pre-filled with target sets × reps per exercise; start a plan to begin logging against it and end it when the program is over. Duplicate a plan to tweak a copy without touching the original; only one plan is ever active at a time
-- **Workout log** — a day-by-day timeline for an active plan, with gaps between sessions labeled as rest days
-- **Settings** — your name, gender, age, height and weight; light/dark/system appearance
-- **Scrollable wheel pickers** for every number you enter (weight, reps, sets, age, height, weight) instead of tapping +/- repeatedly
+- **Progress** — a card dashboard of weekly volume, sessions, muscle-group split and best lifts, with a month calendar of training days a tap away
+- **Settings** — body weight, light/dark/system appearance, and JSON export/import of everything (behind the profile button on Train)
 - **Starter content** — first launch seeds an exercise library and two sample plans (Push / Pull / Legs, Upper / Lower) so you can try it immediately
 
 ## Requirements

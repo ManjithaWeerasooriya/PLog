@@ -77,10 +77,10 @@ enum ProgressiveOverload {
         return .matched
     }
 
-    /// A short inline hint shown while logging, e.g. "Last time: 60kg × 8".
+    /// A short inline hint shown while logging, e.g. "Last time: 60 kg × 8".
     static func lastTimeLabel(for snapshot: SetSnapshot?, unit: String = "kg") -> String? {
         guard let snapshot, snapshot.reps > 0 else { return nil }
         let weight = WeightFormatter.string(snapshot.weight)
-        return "Last time: \(weight)\(unit) × \(snapshot.reps)"
+        return "Last time: \(weight) \(unit) × \(snapshot.reps)"
     }
 }

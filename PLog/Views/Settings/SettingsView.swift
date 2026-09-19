@@ -2,7 +2,8 @@
 //  SettingsView.swift
 //  PLog
 //
-//  The Settings tab: appearance, body weight, and data export/import.
+//  Settings, presented as a sheet from the Train tab's profile button: appearance, body
+//  weight, and data export/import.
 //  `UserProfile.ensureExists` guarantees a row already exists by the time this view appears,
 //  so `profiles.first` is safe to treat as non-optional here (the one place in the app where
 //  that's true by construction).
@@ -13,6 +14,7 @@ import SwiftData
 
 struct SettingsView: View {
     @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
     @Query private var profiles: [UserProfile]
 
     private var profile: UserProfile? { profiles.first }
@@ -28,6 +30,12 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
         }
     }
 

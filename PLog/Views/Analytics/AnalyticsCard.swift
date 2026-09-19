@@ -21,7 +21,7 @@ struct AnalyticsCard<Content: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 Color(uiColor: .secondarySystemGroupedBackground),
-                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
             )
     }
 }

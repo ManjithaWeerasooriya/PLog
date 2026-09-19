@@ -42,6 +42,10 @@ struct SetRow: View {
             summary
         }
         .accessibilityHint("Double-tap to edit")
+        // One tick the moment a set first beats last time — not on every step after.
+        .sensoryFeedback(.success, trigger: trend == .improved) { wasImproved, isImproved in
+            !wasImproved && isImproved
+        }
     }
 
     @ViewBuilder

@@ -41,7 +41,7 @@ final class ExerciseEntryViewModel {
 
     var exerciseName: String { entry.exercise?.name ?? "Exercise" }
 
-    /// The inline hint string, e.g. "Last time: 62.5kg × 8".
+    /// The inline hint string, e.g. "Last time: 62.5 kg × 8".
     var lastTimeLabel: String? {
         ProgressiveOverload.lastTimeLabel(for: previousTopSet)
     }

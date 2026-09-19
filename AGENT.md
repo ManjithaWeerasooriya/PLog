@@ -1,6 +1,6 @@
 # PLog — Agent Reference
 
-iOS workout tracker for progressive overload. Lets the user log sets per exercise per session and see whether they improved versus the last time they did the same exercise. Workout plans (Push/Pull/Legs-style day templates) can be started/ended and stamp out pre-filled sessions. Five tabs: Logs, Calendar, Analytics, Library (Plans | Exercises behind a segmented sub-nav), Settings.
+iOS workout tracker for progressive overload. Lets the user log sets per exercise per session and see whether they improved versus the last time they did the same exercise. Workout plans (Push/Pull/Legs-style day templates) can be started/ended and stamp out pre-filled sessions. Three tabs: Train (today's workout + the session log), Progress (analytics dashboard; the month calendar is pushed from it), Library (Plans | Exercises behind a segmented sub-nav). Settings is a sheet behind the profile button on Train.
 
 ---
 
@@ -51,17 +51,19 @@ PLog/                        ← repo root
     │   │   ├── NumberStepper.swift  ← ⊖ / number / ⊕ input for weight/reps/sets/age/etc. — see Code Conventions
     │   │   ├── NameEntrySheet.swift ← "name it first" sheet used to create plans and plan days
     │   │   └── TrendBadge.swift     ← green/red/gray capsule pill; CategoryChip
-    │   ├── Home/
-    │   │   ├── HomeView.swift       ← Logs tab: sessions by month; "+" picks a plan day
+    │   ├── Train/
+    │   │   ├── TrainView.swift      ← Train tab: hero card, then sessions by month; Settings sheet
+    │   │   ├── TrainHeroCard.swift  ← "Start <next day>" card; other days + blank workout in a menu
     │   │   └── WorkoutDayRow.swift  ← one row: name + date, exercise summary (two lines)
     │   ├── Calendar/
-    │   │   └── CalendarView.swift   ← Calendar tab: month grid, workout vs rest days, day detail
+    │   │   └── CalendarView.swift   ← month grid, pushed from Progress; plain stack content
     │   ├── Analytics/
-    │   │   ├── AnalyticsView.swift     ← Analytics tab: card dashboard + Swift Charts
+    │   │   ├── AnalyticsView.swift     ← Progress tab (type keeps its name): card dashboard + charts
     │   │   ├── AnalyticsCard.swift     ← card tile, title, BigStat, ProgressRing
     │   │   └── ActivityDotGrid.swift   ← 3-month "did I train?" dot grid
     │   ├── DayDetail/
-    │   │   ├── DayDetailView.swift       ← editable session header + exercises with sets edited inline
+    │   │   ├── DayDetailView.swift       ← exercises with sets edited inline; metadata behind the title menu
+    │   │   ├── SessionDetailsSheet.swift ← name/date/notes editor (Cancel/Done sheet)
     │   │   ├── ExerciseEntryRows.swift   ← one exercise's rows: header, its SetRows, "Add Set", last-time hint
     │   │   └── SetRow.swift              ← one set: summary row; steppers appear in place when expanded
     │   ├── Entry/
@@ -80,7 +82,7 @@ PLog/                        ← repo root
     │   │   ├── ExerciseLibraryView.swift ← Exercises section: searchable list by category
     │   │   └── AddExerciseView.swift     ← create OR edit (exercise: Exercise? param)
     │   └── Settings/
-    │       ├── SettingsView.swift        ← Settings tab: theme, UserProfile form, Data section
+    │       ├── SettingsView.swift        ← Settings sheet: theme, body weight, Data section
     │       └── DataTransferSection.swift ← Export/Import buttons, file pickers, confirm alerts
     └── Utilities/
         ├── ProgressiveOverload.swift ← SetSnapshot, ProgressTrend, overload logic
@@ -162,7 +164,7 @@ Setting only the to-one side (`slot.planDay = day`, or passing it to the `init`)
 
 `@Query` only works inside a `View` (`@Query` is a property wrapper tied to the SwiftUI environment). The split is:
 
-- **List/read screens** (`HomeView`, `ExerciseLibraryView`, `ExercisePickerView`): use `@Query` directly, keep filtering/grouping inline as computed properties.
+- **List/read screens** (`TrainView`, `ExerciseLibraryView`, `ExercisePickerView`): use `@Query` directly, keep filtering/grouping inline as computed properties.
 - **Mutation-heavy screens** (`ExerciseEntryRows`, `PlanDetailView`): use an `@Observable` view model (`ExerciseEntryViewModel`, `WorkoutPlanViewModel`) that holds the `ModelContext` and owns all insert/delete logic. `ExerciseEntryViewModel` is created per exercise on the session screen; it does **not** prefill in `init` — `ExerciseEntryViewModel.prefill(_:in:)` is called exactly once, by `DayDetailView.addExercise`, so an entry whose sets were all deleted stays empty instead of regrowing a set every time its rows are rebuilt.
 
 ### Passing ModelContext to view models
@@ -183,7 +185,7 @@ Do not deviate from this pattern. Do not try to capture `@Environment` in an `in
 
 ### Navigation
 
-`HomeView` owns a `NavigationStack(path: $path)` with a typed `[WorkoutDay]` path. To push a newly created day immediately to its detail screen, call `path.append(day)` after inserting. Sheets are used for all editor flows (entry form, exercise picker, library actions).
+`TrainView` owns a `NavigationStack(path: $path)` with a typed `[WorkoutDay]` path. To push a newly created day immediately to its detail screen, call `path.append(day)` after inserting. Sheets are used for all editor flows (entry form, exercise picker, library actions).
 
 `LibraryView` (the Library tab) owns the single `NavigationStack` and `NavigationPath` that both of its sections share (mixed types: `WorkoutPlan`, `PlanDay`, `WorkoutDay`, `PlanRoute`, `Exercise`) and registers every `navigationDestination(for:)` at the stack root. `PlanListView` and `ExerciseLibraryView` are plain stack *content* — they set their own title/toolbar/`searchable` but must not wrap themselves in a `NavigationStack`. **Push everything by value** in this stack. A view-builder `NavigationLink { … }` leaves its destination outside the path and `NavigationLink(value:)` rows inside it silently do nothing (row highlights, no push) — that's why the log screen is reached via `PlanRoute.log(plan)` and why `ExerciseLibraryView` links to `ExerciseHistoryView` via `NavigationLink(value: exercise)`. Screens that need to push programmatically (`PlanListView` after naming a new plan, `PlanLogView` after logging) take `path: Binding<NavigationPath>`.
 
@@ -191,23 +193,25 @@ Do not deviate from this pattern. Do not try to capture `@Environment` in an `in
 
 The segmented Plans | Exercises picker is a `@State` in `LibraryView`, rendered as a `.principal` toolbar item with `.navigationBarTitleDisplayMode(.inline)` — i.e. it *replaces* the title in the nav bar. It was first tried as a view above the list, but Exercises' `.searchable` field lives in the nav bar, so the picker jumped down by a search bar's height on every switch; the nav bar is the only slot above the search field. The sections still set `.navigationTitle` so pushed screens get a proper back-button label. Switching sections is only possible at the stack root, so swapping the root view never orphans a pushed screen.
 
-`CalendarView` and `AnalyticsView` each own their own `NavigationStack` (typed `[WorkoutDay]` path → `DayDetailView`; and `Exercise` → `ExerciseHistoryView` respectively).
+`AnalyticsView` (the Progress tab) owns its own `NavigationStack` and registers three destinations: `Exercise` → `ExerciseHistoryView` (best-lifts rows), `ProgressRoute.calendar` → `CalendarView` (the activity card is a `NavigationLink(value:)`), and `WorkoutDay` → `DayDetailView` (the calendar's session rows push through this stack). `CalendarView` is plain stack content — it must not wrap itself in a `NavigationStack`, same rule as the Library sections. `SettingsView` is presented as a sheet from `TrainView`'s profile button and keeps its own `NavigationStack` (with a Done button), which is fine for a sheet.
 
-### Plans → sessions (the Logs tab)
+### Plans → sessions (the Train tab)
 
-`WorkoutLogger.logWorkout(for:on:in:)` stamps a `PlanDay` template into a `WorkoutDay`: one `ExerciseEntry` per slot with `targetSets` sets at `targetReps`, weight prefilled from `WorkoutHistory.previousTopSet` — so logging a plan day means only adjusting weights. It's called from two places that must stay in sync: the **Logs tab** (`HomeView`'s "+" is a `Menu` of the active plan's days, with `WorkoutLogger.suggestedNextDay` flagged "Up next", plus "Blank Workout"; it's a plain button when no plan is active) and the plan's own log screen via `WorkoutPlanViewModel`. `DayDetailView` shows a "Plan Day" row for stamped sessions.
+`WorkoutLogger.logWorkout(for:on:in:)` stamps a `PlanDay` template into a `WorkoutDay`: one `ExerciseEntry` per slot with `targetSets` sets at `targetReps`, weight prefilled from `WorkoutHistory.previousTopSet` — so logging a plan day means only adjusting weights. It's called from two places that must stay in sync: the **Train tab**'s hero card (`TrainHeroCard`: one prominent "Start <`WorkoutLogger.suggestedNextDay`>" button, the other days and "Blank Workout" behind a "Different day" menu; with no loggable plan it offers a blank workout and points at the Library — there is no `+` in the toolbar, the card *is* the daily action) and the plan's own log screen via `WorkoutPlanViewModel`. `DayDetailView` shows a "Plan Day" row for stamped sessions.
 
-`PlanLogView` lists only the sessions stamped from the plan's days (`allDays.filter { $0.planDay?.plan === plan }`), newest first by month, plus the "Up Next" row. It used to pad the list with a row for every rest day in the plan's window (`PlanTimeline`, since deleted) — a 12-week plan rendered ~60 "Rest Day" rows around a handful of sessions. The Calendar tab is where rest days are shown.
+`PlanLogView` lists only the sessions stamped from the plan's days (`allDays.filter { $0.planDay?.plan === plan }`), newest first by month, plus the "Up Next" row. It used to pad the list with a row for every rest day in the plan's window (`PlanTimeline`, since deleted) — a 12-week plan rendered ~60 "Rest Day" rows around a handful of sessions. The calendar (Progress → Activity) is where rest days are counted.
 
-### Calendar & Analytics are read-only over `@Query`
+### Calendar & Progress are read-only over `@Query`
 
-Both tabs follow the list/read-screen pattern: `@Query` in the view, all math in pure helpers. `WorkoutCalendar.monthCells(for:workouts:historyStart:)` classifies every date as `.trained(sessions:)`, `.rest`, `.pending` (today, nothing logged) or `.inactive` (future, or before `historyStart`). **A rest day is only a past date on/after `historyStart`** — the earliest session or earliest `plan.startedAt` — so a fresh install isn't a wall of "rest days". The Analytics activity grid reuses these cells (`WorkoutCalendar.weeks` chunks them into 7-wide columns), so the two tabs can't disagree about which days count.
+Both screens follow the list/read-screen pattern: `@Query` in the view, all math in pure helpers. `WorkoutCalendar.monthCells(for:workouts:historyStart:)` classifies every date as `.trained(sessions:)`, `.rest`, `.pending` (today, nothing logged) or `.inactive` (future, or before `historyStart`). **A rest day is only a past date on/after `historyStart`** — the earliest session or earliest `plan.startedAt` — so a fresh install isn't a wall of "rest days". The Progress activity grid reuses these cells (`WorkoutCalendar.weeks` chunks them into 7-wide columns), so the two screens can't disagree about which days count.
+
+**Calendar cell language is iOS Calendar's, by design.** A trained day is a filled accent circle with a white number; today is an accent number; the selected day is a filled label-coloured circle with an inverted number, plus a small accent dot beneath it when it was also trained. Rest and inactive days get *nothing* — an earlier version drew an open-circle dot under every past rest day plus a legend, which decorated the default state and made the grid noisy; the month summary caption ("3 workouts · 6 rest days") carries the rest-day count in words instead. Don't add per-day decoration for the absence of a workout.
 
 `WorkoutStats` (weekly summaries, daily volumes, muscle split, week streak, best lifts) always returns fixed-width series that include empty periods as zeros, so bar charts keep a stable width. Weeks are bucketed by `Calendar.dateInterval(of: .weekOfYear)` start, honoring the device's first weekday. The "Best lifts" trend reuses `ProgressiveOverload.trend` on the last two sessions' top sets — don't compare raw weights there either. Volume totals display via `WeightFormatter.volumeString` (grouped, no decimals); individual weights still use `WeightFormatter.string`.
 
-`AnalyticsView`'s cards use `Color(uiColor: .secondarySystemGroupedBackground)` tiles on a `.systemGroupedBackground` scroll view so they look right in both themes; wrap any new widget in `AnalyticsCard` rather than inventing another card style.
+`AnalyticsView`'s cards use `Color(uiColor: .secondarySystemGroupedBackground)` tiles on a `.systemGroupedBackground` scroll view so they look right in both themes; wrap any new widget in `AnalyticsCard` rather than inventing another card style (`TrainHeroCard` uses it too — it's the app's one card container). Cards are 16-pt continuous-radius with 16-pt gaps between them and 12-pt spacing inside (8-pt grid).
 
-**Exactly one plan can be active.** `WorkoutPlanViewModel.start()` fetches every plan and sets `endedAt` on any other active one before starting this one. `HomeView` relies on this (`plans.first(where: \.isActive)`). Don't add another code path that sets `startedAt` without going through `start()`.
+**Exactly one plan can be active.** `WorkoutPlanViewModel.start()` fetches every plan and sets `endedAt` on any other active one before starting this one. `TrainView` relies on this (`plans.first(where: \.isActive)`). Don't add another code path that sets `startedAt` without going through `start()`.
 
 ### Exercises are editable in place
 
@@ -227,12 +231,14 @@ Both tabs follow the list/read-screen pattern: `@Query` in the view, all math in
 
 Two lanes, matching how Apple's own apps behave — pick one per screen, never mix them:
 
-- **Pushed detail screens** (`DayDetailView`, `PlanDetailView`, `PlanDayDetailView`) live-bind `@Model` properties and **autosave** (the Notes/Reminders model). They use the system back button and title; the edge-swipe-back gesture always works; nothing is confirmed on the way out. Structural changes (add/remove a set, exercise, day) call `try? context.save()` immediately, as everywhere else.
-- **Sheets that draft locally** (`AddExerciseView`, `NameEntrySheet`) keep Cancel / Save (or Create) and `.interactiveDismissDisabled(hasChanges)` with a "Discard Changes?" `.alert` — the modal-editor model. The model is never touched until Save.
+- **Pushed detail screens** (`PlanDetailView`, `PlanDayDetailView`; `DayDetailView` hosts the sets, which bind straight into `SetEntry`) live-bind `@Model` properties and **autosave** (the Notes/Reminders model). They use the system back button and title; the edge-swipe-back gesture always works; nothing is confirmed on the way out. Structural changes (add/remove a set, exercise, day) call `try? context.save()` immediately, as everywhere else.
+- **Sheets that draft locally** (`AddExerciseView`, `NameEntrySheet`, `SessionDetailsSheet`) keep Cancel / Save (or Create / Done) and `.interactiveDismissDisabled(hasChanges)` with a "Discard Changes?" `.alert` — the modal-editor model. The model is never touched until Save.
 
 **Don't reintroduce a back-button guard.** An earlier version replaced the system back button on the pushed screens with a custom one that asked Save / Discard / Cancel and showed an orange "Unsaved" tag in the title. That bolted a modal save model onto detail screens: it hid the platform back button, killed swipe-back, and (on iOS 26) opted those screens out of the system's glass back button entirely — while the sheets already had a proper Cancel/Done. If a screen genuinely needs a safety net for accidental edits, the platform answer is `UndoManager` (`context.undoManager`, shake-to-undo), not a confirmation on back.
 
-`SettingsView` is a root tab and live-applies preferences, as Settings apps conventionally do.
+`SettingsView` (a sheet with a Done button) live-applies preferences, as Settings apps conventionally do.
+
+**A session's name, date and notes live behind the title.** `DayDetailView` sets `.navigationTitle` to the session name (or its date when unnamed) and attaches `.toolbarTitleMenu` with "Edit Details…" (→ `SessionDetailsSheet`) and "Delete Workout" (stage-then-`.alert`, then `dismiss()`), the Notes/Freeform pattern; the exercises section header shows "date · plan name", and a Notes section appears at the bottom only when there is a note. This exists so the exercises are the first thing on the screen — the old "Session" form section (name field, date picker, notes) pushed the actual content below the fold.
 
 ### Data export / import is a JSON snapshot, not the SwiftData store
 
@@ -278,7 +284,7 @@ Every screen has a `#Preview` using `SampleData`:
 
 ```swift
 #Preview {
-    HomeView()
+    TrainView()
         .modelContainer(SampleData.container)
 }
 ```
@@ -309,7 +315,7 @@ When adding a new screen, always wire up a `#Preview` using `SampleData.containe
 
 ### Accessibility: colour on the icon and fill, never on small text
 
-Every tinted pill — `TrendBadge`, `CategoryChip`, `PlanStatusPill` — puts the semantic colour on its SF Symbol (or a leading dot) and on the capsule fill (`color.opacity(0.15)`); the **text is always `.primary`**. System green/red/orange/yellow/mint/cyan as *text* on a light background are 1.5–3.5:1, all under the 4.5:1 AA floor, and `.caption`-sized text is exactly where that bites. Label colour on any grouped background is ≥ 15:1, and system colours pick up their high-contrast variants under Increase Contrast on their own. `MuscleGroup.core` is `.brown` rather than `.yellow` because yellow fails even as a fill/icon on a light card. Don't add a new coloured-text pill; don't use `.caption2` for anything (the smallest text style in the app is `.caption`).
+Every tinted pill — `TrendBadge`, `CategoryChip`, `PlanStatusPill` — puts the semantic colour on its SF Symbol (or a leading dot) and on the capsule fill (`color.opacity(0.15)`); the **text is always `.primary`**. System green/red/orange/yellow/mint/cyan as *text* on a light background are 1.5–3.5:1, all under the 4.5:1 AA floor, and `.caption`-sized text is exactly where that bites. Label colour on any grouped background is ≥ 15:1, and system colours pick up their high-contrast variants under Increase Contrast on their own. `MuscleGroup.core` is `.brown` rather than `.yellow` because yellow fails even as a fill/icon on a light card. `AccentColor` is declared in the asset catalog (system blue's light/dark pair) rather than left to the default — the choice is deliberate: every other hue is a muscle group or plan status, and blue already means "trained / interactive" across the calendar, charts and buttons. Switching to a signature colour later is one asset edit, but check it against `MuscleGroup`/`PlanStatus` first. Don't add a new coloured-text pill; don't use `.caption2` for anything (the smallest text style in the app is `.caption`).
 
 **Dynamic Type.** No fixed point sizes or widths on anything that holds text: `BigStat` takes a `Font.TextStyle`, not a number; segmented pickers size to their labels (the Library and Analytics range pickers had hard-coded widths that clipped); dimensions that should grow with text use `@ScaledMetric` (calendar day circles, rings, legend dots, stepper buttons). Layouts that put two things side by side use `ViewThatFits(in: .horizontal) { HStack {…}; VStack {…} }` (Analytics card pairs and card headers, the two hero steppers in `SetRow`/`PlanExerciseRow`, the muscle-split donut + legend), or switch on `dynamicTypeSize.isAccessibilitySize` when the two arrangements aren't the same children (`WorkoutDayRow`, the `ExerciseEntryRows`/`SetRow`/`PlanExerciseRow` headers). Two deliberate exceptions: the activity dot grid and the muscle-split donut are charts, not text, and keep fixed sizes so three months of weeks still fit across the card; and every Swift `Chart` is capped at `.dynamicTypeSize(...DynamicTypeSize.xxxLarge)` because axis labels collide above that — the same approach Health takes. Verify at `accessibility-extra-extra-extra-large` (`xcrun simctl ui <udid> content_size …`); anything that wraps word-per-word or pushes the page wider than the screen (a vertical `ScrollView` silently centres over-wide content, which shows up as the *nav title* being cut off) needs one of the treatments above.
 
